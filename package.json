@@ -1,0 +1,28 @@
+{
+  "name": "jobpilot-ai",
+  "version": "1.0.0",
+  "description": "Autonomous AI Job Application Agent & Multi-Portal Auto-Applier with Real-Time Tracking",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "test": "node -e \"console.log('JobPilot-AI Ready!')\""
+  },
+  "keywords": [
+    "job-search",
+    "automation",
+    "ai-agent",
+    "llm",
+    "linkedin-applier",
+    "naukri-bot",
+    "indeed-bot",
+    "electron",
+    "playwright"
+  ],
+  "author": "JobPilot-AI Community",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^28.2.0"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobPilot-AI — Autonomous Job Application Agent</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+
+  <!-- ═══ Titlebar ═══ -->
+  <div class="titlebar">
+    <div class="titlebar-title">
+      <div style="width: 14px; height: 14px; border-radius: 4px; background: #3b82f6; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #fff;">JP</div>
+      <span>JobPilot-AI — Autonomous Job Application Agent</span>
+    </div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" id="btn-min" title="Minimize">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.5"/></svg>
+      </button>
+      <button class="titlebar-btn" id="btn-max" title="Maximize">
+        <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+      </button>
+      <button class="titlebar-btn titlebar-btn-close" id="btn-close" title="Close">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ App Container ═══ -->
+  <div class="app-container">
+
+    <!-- ═══ Sidebar ═══ -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="brand-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <div style="display: flex; align-items: center;">
+            <span class="brand-name">JobPilot</span>
+            <span class="brand-badge">AI</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#dashboard" class="nav-item active" data-page="dashboard">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a href="#ai-agent" class="nav-item" data-page="ai-agent" style="background: linear-gradient(90deg, rgba(59,130,246,0.1), transparent); border-left: 3px solid #8b5cf6;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          <span style="color: #c4b5fd; font-weight: 600;">AI Command Agent</span>
+        </a>
+        <a href="#tracker" class="nav-item" data-page="tracker">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Tracker & History</span>
+        </a>
+        <a href="#guide" class="nav-item" data-page="guide" style="color: #34d399;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span style="font-weight: 600;">Setup Guide & Free Keys</span>
+        </a>
+        <a href="#settings" class="nav-item" data-page="settings">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Bot Status Card -->
+      <div class="sidebar-bot-widget">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Bot Status</span>
+          <span style="display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #fff;">
+            <span class="status-dot inactive" id="bot-status-dot"></span>
+            <span id="bot-status-text">Idle</span>
+          </span>
+        </div>
+        <div class="bot-stat-row">
+          <span>Runtime</span>
+          <span class="bot-stat-value" id="bot-runtime">0m 0s</span>
+        </div>
+        <div class="bot-stat-row">
+          <span>Applications</span>
+          <span class="bot-stat-value" id="bot-applied">0</span>
+        </div>
+        <button class="btn btn-primary" id="bot-toggle-btn" style="width: 100%; margin-top: 10px; padding: 8px; font-size: 12px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Start Bot</span>
+        </button>
+      </div>
+
+      <!-- Candidate Info -->
+      <div style="padding: 12px 14px; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px;">
+        <div id="user-avatar" style="width: 32px; height: 32px; border-radius: 6px; background: #1a2236; border: 1px solid #232d42; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #fff;">JP</div>
+        <div style="overflow: hidden;">
+          <div id="user-name" style="font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">Job Candidate</div>
+          <div id="user-email" style="font-size: 10px; color: #64748b; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">your_email@gmail.com</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ═══ Main Content ═══ -->
+    <main class="main-content">
+      <!-- Universal Prompt Bar -->
+      <div class="universal-prompt-bar">
+        <div style="display: flex; align-items: center; gap: 6px; color: #a78bfa; font-size: 12px; font-weight: 600; white-space: nowrap;">
+          <span>✨ AI Prompt:</span>
+        </div>
+        <input type="text" id="universal-ai-input" placeholder="Give instructions to AI (e.g. 'Change target location to London', 'Apply to 5 Python jobs on LinkedIn')...">
+        <button id="universal-ai-btn" class="btn btn-primary" style="padding: 7px 14px; font-size: 12px;">Execute</button>
+      </div>
+
+      <!-- Topbar Header -->
+      <div class="topbar">
+        <div>
+          <h1 id="page-title" style="font-size: 18px; font-weight: 700; color: #fff; margin: 0;">Dashboard</h1>
+          <p id="page-subtitle" style="font-size: 12px; color: #94a3b8; margin: 2px 0 0 0;">Real-time overview of your AI job application bot</p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <!-- Preferred Location Pill -->
+          <div style="display: flex; align-items: center; background: #141a29; border: 1px solid #10b981; border-radius: 8px; padding: 6px 10px; gap: 6px;">
+            <span style="font-size: 12px; color: #94a3b8; font-weight: 500;">📍 Location:</span>
+            <select id="global-loc-selector" style="background: transparent; color: #34d399; border: none; font-size: 12px; font-weight: 700; outline: none; cursor: pointer;">
+              <option value="Remote" style="background: #141a29; color: #fff;">🌐 Remote Worldwide</option>
+              <option value="New York" style="background: #141a29; color: #fff;">📍 New York</option>
+              <option value="San Francisco" style="background: #141a29; color: #fff;">📍 San Francisco</option>
+              <option value="Bengaluru" style="background: #141a29; color: #fff;">📍 Bengaluru</option>
+              <option value="London" style="background: #141a29; color: #fff;">📍 London</option>
+            </select>
+          </div>
+
+          <!-- Experience Mode Pill -->
+          <div style="display: flex; align-items: center; background: #141a29; border: 1px solid #3b82f6; border-radius: 8px; padding: 6px 10px; gap: 6px;">
+            <span style="font-size: 12px; color: #94a3b8; font-weight: 500;">Mode:</span>
+            <select id="global-exp-selector" style="background: transparent; color: #60a5fa; border: none; font-size: 12px; font-weight: 700; outline: none; cursor: pointer;">
+              <option value="fresher" style="background: #141a29; color: #fff;" selected>🎓 Fresher (0-1 Yrs)</option>
+              <option value="experienced" style="background: #141a29; color: #fff;">💼 Experienced (1-3 Yrs)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page Content Viewport -->
+      <div class="page-container" id="page-container">
+        <!-- Rendered dynamically by active page component -->
+      </div>
+    </main>
+  </div>
+
+  <!-- ═══ Application Modal Overlay ═══ -->
+  <div id="app-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #141a29; border: 1px solid #232d42; border-radius: 12px; width: 480px; max-width: 90%; padding: 22px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 12px 36px rgba(0,0,0,0.6);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h3 id="modal-company" style="margin: 0; font-size: 16px; font-weight: 700; color: #fff;">Company</h3>
+          <p id="modal-role" style="margin: 2px 0 0 0; font-size: 13px; color: #cbd5e1;">Role</p>
+        </div>
+        <button id="modal-close-btn" style="background: transparent; border: none; color: #94a3b8; font-size: 18px; cursor: pointer;">✕</button>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; background: #0c101a; padding: 10px 14px; border-radius: 8px;">
+        <span style="font-size: 12px; color: #94a3b8;">Current Status:</span>
+        <span id="modal-status-badge"></span>
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px;">Update Status:</label>
+        <select id="modal-status-select" style="width: 100%; padding: 9px 12px; background: #0c101a; border: 1px solid #232d42; color: #fff; border-radius: 6px; font-size: 13px; outline: none;">
+          <option value="Applied">Applied</option>
+          <option value="Under Review">Under Review</option>
+          <option value="Assessment / Test">Assessment / Test</option>
+          <option value="Interview Scheduled">Interview Scheduled 🎉</option>
+          <option value="Selected / Offered">Selected / Offered 🏆</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px;">Timeline History:</label>
+        <div id="modal-history-list" style="background: #0c101a; border: 1px solid #232d42; border-radius: 8px; padding: 12px; max-height: 140px; overflow-y: auto; font-size: 12px;"></div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button id="modal-update-btn" class="btn btn-primary" style="padding: 8px 18px; font-size: 13px;">Update Status</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- Page Scripts -->
+  <script src="scripts/pages/guide.js"></script>
+  <script src="scripts/pages/dashboard.js"></script>
+  <script src="scripts/pages/ai-agent.js"></script>
+  <script src="scripts/pages/tracker.js"></script>
+  <script src="scripts/pages/settings.js"></script>
+  <script src="scripts/app.js"></script>
+</body>
+</html>

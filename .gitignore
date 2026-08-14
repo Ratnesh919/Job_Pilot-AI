@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Sensitive user credentials & personal resumes
+.env
+.env.local
+api_key.txt
+api_keys.txt
+*credential*.json
+*token*.json
+Resume*.pdf
+Resume*.docx
+*.pdf
+*.docx
+
+# Runtime Application Data & Profiles
+data/applications_db.json
+data/notifications.json
+data/chrome_profile/
+data/user_profile/
+data/*.csv
+logs/
+*.log
+
+# Electron & OS artifacts
+dist/
+out/
+build/
+.DS_Store
+Thumbs.db
+*.tmp

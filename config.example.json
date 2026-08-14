@@ -1,0 +1,68 @@
+{
+  "candidate": {
+    "name": "Your Full Name",
+    "email": "your_email@gmail.com",
+    "phone": "+1 (555) 000-0000",
+    "location": "New York, NY / Remote",
+    "portfolio": "https://yourportfolio.dev",
+    "linkedin": "https://linkedin.com/in/yourprofile",
+    "github": "https://github.com/yourusername",
+    "figma": "",
+    "notice_period": "Immediate / 2 Weeks",
+    "experience_years": "0-1",
+    "degree": "B.S. / B.Tech in Computer Science / Engineering",
+    "skills": [
+      "Python",
+      "JavaScript",
+      "TypeScript",
+      "React",
+      "Node.js",
+      "REST APIs",
+      "SQL",
+      "Git",
+      "Docker",
+      "AI & LLM Prompting"
+    ]
+  },
+  "api_keys": {
+    "openrouter": "",
+    "nvidia": "",
+    "gemini": ""
+  },
+  "email": {
+    "sender": "your_email@gmail.com",
+    "app_password": ""
+  },
+  "browser": {
+    "chrome_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "user_data_path": "",
+    "headless": true
+  },
+  "target_roles": [
+    "Software Engineer",
+    "Python Developer",
+    "Frontend Developer",
+    "Full Stack Developer",
+    "Backend Developer",
+    "AI / ML Engineer",
+    "Data Analyst",
+    "UI/UX Designer"
+  ],
+  "bot_settings": {
+    "max_per_run": 10,
+    "delay_ms": 2000,
+    "retry_count": 3,
+    "enable_desktop_notifications": true
+  },
+  "experience_level": "fresher",
+  "preferred_locations": [
+    "Remote",
+    "New York",
+    "San Francisco",
+    "Bengaluru",
+    "London"
+  ],
+  "primary_location": "Remote",
+  "include_remote": true,
+  "resume_path": "./Resume.pdf"
+}
