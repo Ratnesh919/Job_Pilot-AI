@@ -13,6 +13,20 @@ window.GuidePage = {
                     </div>
                 </div>
 
+                <!-- Important Prerequisite Alert -->
+                <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid #f59e0b50; border-radius: 12px; padding: 20px 24px; display: flex; gap: 14px; align-items: flex-start;">
+                    <span style="font-size: 26px; line-height: 1;">⚠️</span>
+                    <div style="flex-grow: 1;">
+                        <div style="font-weight: 700; color: #fbbf24; font-size: 14px; margin-bottom: 4px;">IMPORTANT PREREQUISITE: Log into your Chrome accounts ONCE</div>
+                        <p style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin: 0 0 10px 0;">
+                            For automated job applications on <strong>LinkedIn</strong>, <strong>Naukri</strong>, and <strong>Indeed</strong> to work smoothly without triggering CAPTCHAs, JobPilot-AI connects securely to your local Google Chrome session. You only need to log in <strong>once</strong>.
+                        </p>
+                        <button class="btn btn-primary" id="guide-open-login-btn" style="font-size: 12px; padding: 7px 16px; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🌐 Open Chrome to Log In (1-Click)</span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- 1. Free API Keys Section -->
                 <div class="guide-section" style="background: #141a29; border: 1px solid #232d42; border-radius: 12px; padding: 22px 26px;">
                     <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
@@ -117,6 +131,13 @@ window.GuidePage = {
     },
 
     init: () => {
+        document.getElementById('guide-open-login-btn')?.addEventListener('click', async () => {
+            if (window.electronAPI && window.electronAPI.openLoginBrowser) {
+                window.showToast('Opening Chrome. Log in to LinkedIn, Naukri, and Indeed.', 'info');
+                await window.electronAPI.openLoginBrowser();
+            }
+        });
+
         document.querySelectorAll('.guide-open-url, .guide-ext-link').forEach(el => {
             el.addEventListener('click', (e) => {
                 e.preventDefault();

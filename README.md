@@ -40,13 +40,21 @@
 ### 1-Click Installation
 1. Clone or download this repository:
    ```bash
-   git clone https://github.com/yourusername/JobPilot-AI.git
-   cd JobPilot-AI
+   git clone https://github.com/Ratnesh919/Job_Pilot-AI.git
+   cd Job_Pilot-AI
    ```
 2. Double-click **`install.bat`** (or run `npm run install:all` in terminal).
    * This automatically installs Python dependencies, Playwright Chromium binaries, and Node packages.
-3. Place your resume PDF in the project root named **`Resume.pdf`**.
-4. Double-click **`run.bat`** to launch the desktop application!
+3. Double-click **`run.bat`** to launch the desktop application!
+
+---
+
+> [!IMPORTANT]  
+> ### ⚠️ PREREQUISITE: Log into your Chrome accounts ONCE
+> For automated applications on **LinkedIn**, **Naukri**, and **Indeed** to work seamlessly without triggering CAPTCHAs or security checkpoints:
+> 1. In the desktop app, go to **Settings** -> Click **"🌐 Login to Portals"** (or click the button in the login prompt modal).
+> 2. Log in to your LinkedIn, Naukri, and Indeed accounts **once** in the opened Chrome window.
+> 3. JobPilot-AI will securely reuse this authenticated browser session for all subsequent autonomous background runs!
 
 ---
 

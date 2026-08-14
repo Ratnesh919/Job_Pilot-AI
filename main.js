@@ -381,34 +381,29 @@ function setupIPC() {
   ipcMain.handle('get-bot-status', () => getBotStatus());
   ipcMain.handle('test-smtp', async () => await testSmtp());
 
+  ipcMain.handle('check-login-status', async () => {
+    return new Promise((resolve) => {
+      const script = path.join(BACKEND_DIR, 'login_detector.py');
+      const proc = spawn('python', ['-u', script, '--check'], {
+        cwd: BACKEND_DIR,
+        env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' }
+      });
+      let out = '';
+      proc.stdout.on('data', (d) => { out += d.toString('utf-8'); });
+      proc.on('close', () => {
+        try {
+          const res = JSON.parse(out.trim());
+          resolve(res);
+        } catch (e) {
+          resolve({ linkedin: false, naukri: false, any_logged_in: false, needs_login: true });
+        }
+      });
+    });
+  });
+
   ipcMain.handle('open-login-browser', async () => {
-    const profileDir = path.join(DATA_DIR, 'chrome_profile');
-    const pythonCode = `
-import asyncio, os
-from playwright.async_api import async_playwright
-
-async def main():
-    os.makedirs(r'${profileDir.replace(/\\/g, '\\\\')}', exist_ok=True)
-    async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
-            user_data_dir=r'${profileDir.replace(/\\/g, '\\\\')}',
-            headless=False,
-            args=['--no-first-run']
-        )
-        p1 = context.pages[0] if context.pages else await context.new_page()
-        await p1.goto('https://www.linkedin.com/login')
-        p2 = await context.new_page()
-        await p2.goto('https://www.naukri.com/nlogin/login')
-        print('[BROWSER] Login browser opened. You can log into LinkedIn & Naukri once.', flush=True)
-        try:
-            await p1.wait_for_timeout(300000)
-        except:
-            pass
-        await context.close()
-
-asyncio.run(main())
-`;
-    spawn('python', ['-u', '-c', pythonCode], {
+    const script = path.join(BACKEND_DIR, 'login_detector.py');
+    spawn('python', ['-u', script, '--open'], {
       cwd: BACKEND_DIR,
       env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' }
     });

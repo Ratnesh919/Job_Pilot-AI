@@ -205,12 +205,81 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (appliedEl) appliedEl.textContent = window.appState.applications.length || 0;
     }
 
+    // 6. Portal Login Modal Controller
+    window.showLoginPromptModal = (status) => {
+        const modal = document.getElementById('login-prompt-modal');
+        const linkedinBadge = document.getElementById('login-modal-linkedin-badge');
+        const naukriBadge = document.getElementById('login-modal-naukri-badge');
+        const openChromeBtn = document.getElementById('btn-login-modal-open-chrome');
+        const skipBtn = document.getElementById('btn-login-modal-skip');
+
+        if (!modal) return;
+
+        if (linkedinBadge) {
+            if (status.linkedin) {
+                linkedinBadge.textContent = 'LinkedIn: Logged In ✓';
+                linkedinBadge.style.background = '#10b98120';
+                linkedinBadge.style.color = '#34d399';
+                linkedinBadge.style.borderColor = '#10b98140';
+            } else {
+                linkedinBadge.textContent = 'LinkedIn: Not Logged In ✕';
+                linkedinBadge.style.background = '#ef444420';
+                linkedinBadge.style.color = '#f87171';
+                linkedinBadge.style.borderColor = '#ef444440';
+            }
+        }
+
+        if (naukriBadge) {
+            if (status.naukri) {
+                naukriBadge.textContent = 'Naukri: Logged In ✓';
+                naukriBadge.style.background = '#10b98120';
+                naukriBadge.style.color = '#34d399';
+                naukriBadge.style.borderColor = '#10b98140';
+            } else {
+                naukriBadge.textContent = 'Naukri: Not Logged In ✕';
+                naukriBadge.style.background = '#ef444420';
+                naukriBadge.style.color = '#f87171';
+                naukriBadge.style.borderColor = '#ef444440';
+            }
+        }
+
+        modal.style.display = 'flex';
+
+        if (openChromeBtn) {
+            openChromeBtn.onclick = async () => {
+                modal.style.display = 'none';
+                window.showToast('Opening Chrome. Log in to your accounts and close browser when done.', 'info');
+                if (window.electronAPI && window.electronAPI.openLoginBrowser) {
+                    await window.electronAPI.openLoginBrowser();
+                }
+            };
+        }
+
+        if (skipBtn) {
+            skipBtn.onclick = async () => {
+                modal.style.display = 'none';
+                const res = await window.electronAPI.startBot({ headless: true });
+                window.showToast(res.message, res.success ? 'success' : 'error');
+            };
+        }
+
+        modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+    };
+
     botBtn?.addEventListener('click', async () => {
         if (!window.electronAPI) return;
         if (window.appState.botStatus.running) {
             const res = await window.electronAPI.stopBot();
             window.showToast(res.message, res.success ? 'success' : 'error');
         } else {
+            // Check if portals are logged in first
+            if (window.electronAPI.checkLoginStatus) {
+                const status = await window.electronAPI.checkLoginStatus();
+                if (status.needs_login) {
+                    window.showLoginPromptModal(status);
+                    return;
+                }
+            }
             const res = await window.electronAPI.startBot({ headless: true });
             window.showToast(res.message, res.success ? 'success' : 'error');
         }

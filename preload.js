@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Logs & Login
   getLogs: () => ipcRenderer.invoke('get-applications'),
   openLoginBrowser: () => ipcRenderer.invoke('open-login-browser'),
+  checkLoginStatus: () => ipcRenderer.invoke('check-login-status'),
 
   // Bot Control
   startBot: (options) => ipcRenderer.invoke('start-bot', options),

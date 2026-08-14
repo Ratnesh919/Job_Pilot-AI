@@ -188,6 +188,35 @@
     </div>
   </div>
 
+  <!-- ═══ Portal Login Prompt Modal ═══ -->
+  <div id="login-prompt-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1001; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: #141a29; border: 1px solid #f59e0b50; border-radius: 14px; width: 500px; max-width: 90%; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 16px 40px rgba(0,0,0,0.7);">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 42px; height: 42px; border-radius: 10px; background: #f59e0b20; border: 1px solid #f59e0b50; display: flex; align-items: center; justify-content: center; font-size: 22px;">⚠️</div>
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #fff;">Portal Login Required</h3>
+          <p style="margin: 2px 0 0 0; font-size: 12px; color: #94a3b8;">Log into your job portal accounts once in Chrome</p>
+        </div>
+      </div>
+      <div style="background: #0c101a; border: 1px solid #232d42; border-radius: 8px; padding: 14px; font-size: 13px; color: #cbd5e1; line-height: 1.5;">
+        <p style="margin: 0 0 8px 0;"><strong style="color: #fbbf24;">Why is this required?</strong></p>
+        <p style="margin: 0 0 12px 0; color: #94a3b8; font-size: 12px;">
+          To auto-apply on <strong>LinkedIn & Naukri</strong> without CAPTCHA roadblocks, JobPilot-AI attaches to your Chrome profile. You only need to log in <strong>once</strong>.
+        </p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <span id="login-modal-linkedin-badge" style="font-size: 11px; padding: 4px 10px; border-radius: 4px; background: #ef444420; color: #f87171; border: 1px solid #ef444440; font-weight: 600;">LinkedIn: Not Logged In</span>
+          <span id="login-modal-naukri-badge" style="font-size: 11px; padding: 4px 10px; border-radius: 4px; background: #ef444420; color: #f87171; border: 1px solid #ef444440; font-weight: 600;">Naukri: Not Logged In</span>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+        <button id="btn-login-modal-skip" class="btn btn-secondary" style="font-size: 12px; padding: 8px 14px;">Skip & Run in Guest Mode</button>
+        <button id="btn-login-modal-open-chrome" class="btn btn-primary" style="font-size: 13px; padding: 9px 18px; display: flex; align-items: center; gap: 6px;">
+          <span>🌐 Open Chrome & Log In (1-Click)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
