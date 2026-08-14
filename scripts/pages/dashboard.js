@@ -9,6 +9,7 @@ window.DashboardPage = {
                         <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Add your resume, target roles, and free API keys to enable autonomous applications.</div>
                     </div>
                     <div style="display: flex; gap: 10px;">
+                        <button id="dash-quick-upload-resume" class="btn btn-secondary" style="font-size: 12px; padding: 8px 14px; display: flex; align-items: center; gap: 6px;">📄 Upload Resume</button>
                         <a href="#guide" class="btn btn-secondary" style="font-size: 12px; padding: 8px 14px;">View Guide</a>
                         <a href="#settings" class="btn btn-primary" style="font-size: 12px; padding: 8px 14px;">Configure Settings ⚙️</a>
                     </div>
@@ -90,10 +91,20 @@ Click 'Start Bot' to begin autonomous multi-portal job applications.
         // Check if configuration needs initial setup
         const cfg = window.appState?.config || {};
         const banner = document.getElementById('dash-setup-banner');
+        const quickUploadBtn = document.getElementById('dash-quick-upload-resume');
         if (banner) {
             const needsSetup = !cfg.email?.sender || !cfg.api_keys?.openrouter;
             banner.style.display = needsSetup ? 'flex' : 'none';
         }
+
+        quickUploadBtn?.addEventListener('click', async () => {
+            if (window.electronAPI && window.electronAPI.selectResumeFile) {
+                const res = await window.electronAPI.selectResumeFile();
+                if (res.success) {
+                    window.showToast(`Resume uploaded: ${res.fileName}`, 'success');
+                }
+            }
+        });
 
         // Render stats
         const stats = window.appState?.stats || {};

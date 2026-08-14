@@ -88,7 +88,27 @@ window.SettingsPage = {
                     </div>
                 </div>
 
-                <!-- 4. Candidate Profile -->
+                <!-- 4. Resume Document Section -->
+                <div class="settings-section" style="background: #141a29; padding: 22px 26px; border-radius: 12px; border: 1px solid #232d42;">
+                    <h3 style="margin: 0 0 16px 0; font-size: 15px; font-weight: 700; color: #fff; border-bottom: 1px solid #232d42; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>📄 Active Resume Document (PDF)</span>
+                        <span style="font-size: 11px; color: #10b981; background: #10b98120; padding: 3px 8px; border-radius: 4px;">Attached to Form Submissions & Emails</span>
+                    </h3>
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: #0c101a; border: 1px dashed #3b82f6; padding: 16px 20px; border-radius: 8px; gap: 14px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="font-size: 28px;">📄</div>
+                            <div>
+                                <div id="resume-filename-display" style="font-weight: 600; color: #fff; font-size: 14px;">${config.resume_path ? config.resume_path.split('\\\\').pop().split('/').pop() : 'Resume.pdf'}</div>
+                                <div id="resume-path-display" style="font-size: 11px; color: #94a3b8; font-family: monospace; margin-top: 2px;">${config.resume_path || 'Resume.pdf (Active)'}</div>
+                            </div>
+                        </div>
+                        <button type="button" id="btn-upload-resume" class="btn btn-primary" style="padding: 9px 18px; font-size: 13px; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                            <span>📁 Upload / Change Resume</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5. Candidate Profile -->
                 <div class="settings-section" style="background: #141a29; padding: 22px 26px; border-radius: 12px; border: 1px solid #232d42;">
                     <h3 style="margin: 0 0 16px 0; font-size: 15px; font-weight: 700; color: #fff; border-bottom: 1px solid #232d42; padding-bottom: 10px;">👤 Candidate Profile & Resume Links</h3>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -132,7 +152,21 @@ window.SettingsPage = {
 
     init: () => {
         const testBtn = document.getElementById('test-smtp-btn');
+        const uploadResumeBtn = document.getElementById('btn-upload-resume');
         const saveBtns = [document.getElementById('save-settings-btn'), document.getElementById('save-settings-btn-top')];
+
+        uploadResumeBtn?.addEventListener('click', async () => {
+            if (window.electronAPI && window.electronAPI.selectResumeFile) {
+                const res = await window.electronAPI.selectResumeFile();
+                if (res.success) {
+                    const fnEl = document.getElementById('resume-filename-display');
+                    const fpEl = document.getElementById('resume-path-display');
+                    if (fnEl) fnEl.textContent = res.fileName;
+                    if (fpEl) fpEl.textContent = res.filePath;
+                    window.showToast(`Resume uploaded successfully: ${res.fileName}`, 'success');
+                }
+            }
+        });
 
         document.querySelectorAll('.guide-ext-link').forEach(el => {
             el.addEventListener('click', (e) => {

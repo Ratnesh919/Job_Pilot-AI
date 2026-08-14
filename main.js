@@ -416,6 +416,33 @@ asyncio.run(main())
   });
 
   ipcMain.handle('open-external', (_, url) => { shell.openExternal(url); });
+  
+  ipcMain.handle('select-resume-file', async () => {
+    const { dialog } = require('electron');
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Resume PDF File',
+      filters: [{ name: 'PDF Resume', extensions: ['pdf'] }],
+      properties: ['openFile']
+    });
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selectedPath = result.filePaths[0];
+      const targetPath = path.join(ROOT_DIR, 'Resume.pdf');
+      try {
+        fs.copyFileSync(selectedPath, targetPath);
+      } catch (e) {
+        console.error('Error copying resume:', e);
+      }
+      const config = loadConfig();
+      config.resume_path = targetPath;
+      saveConfig(config);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('config-updated', config);
+      }
+      return { success: true, filePath: targetPath, fileName: path.basename(selectedPath) };
+    }
+    return { success: false, canceled: true };
+  });
   ipcMain.handle('minimize-window', () => { if (mainWindow) mainWindow.minimize(); });
   ipcMain.handle('maximize-window', () => {
     if (mainWindow) {

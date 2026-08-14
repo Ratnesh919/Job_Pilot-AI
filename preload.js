@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // External Links
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  selectResumeFile: () => ipcRenderer.invoke('select-resume-file'),
 
   // Window Controls
   minimize: () => ipcRenderer.invoke('minimize-window'),
