@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 let mainWindow = null;
 let activeBotProcess = null;
@@ -433,13 +433,38 @@ asyncio.run(main())
       } catch (e) {
         console.error('Error copying resume:', e);
       }
-      const config = loadConfig();
-      config.resume_path = targetPath;
-      saveConfig(config);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('config-updated', config);
+
+      // Automatically run AI Resume Extractor
+      let extractedData = null;
+      try {
+        const script = path.join(BACKEND_DIR, 'resume_extractor.py');
+        const proc = spawnSync('python', ['-u', script, targetPath], {
+          cwd: BACKEND_DIR,
+          env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' }
+        });
+        if (proc.stdout) {
+          const res = JSON.parse(proc.stdout.toString('utf-8').trim());
+          if (res.success && res.extracted) {
+            extractedData = res.extracted;
+          }
+        }
+      } catch (e) {
+        console.error('Error in AI resume extraction:', e);
       }
-      return { success: true, filePath: targetPath, fileName: path.basename(selectedPath) };
+
+      const updatedConfig = loadConfig();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('config-updated', updatedConfig);
+        if (extractedData) {
+          mainWindow.webContents.send('resume-extracted', { extracted: extractedData, fileName: path.basename(selectedPath) });
+        }
+      }
+      return {
+        success: true,
+        filePath: targetPath,
+        fileName: path.basename(selectedPath),
+        extracted: extractedData
+      };
     }
     return { success: false, canceled: true };
   });

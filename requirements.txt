@@ -10,6 +10,9 @@ lxml>=4.9.0
 psutil>=5.9.0
 python-dotenv>=1.0.0
 
+# PDF Parsing & Resume AI Extraction
+pypdf>=3.17.0
+
 # Optional Google APIs for Advanced Gmail Sync
 google-auth>=2.20.0
 google-auth-oauthlib>=1.0.0

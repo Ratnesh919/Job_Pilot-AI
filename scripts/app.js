@@ -320,5 +320,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // 11. Live Resume Extracted Event
+    if (window.electronAPI && window.electronAPI.onResumeExtracted) {
+        window.electronAPI.onResumeExtracted(({ extracted, fileName }) => {
+            const name = extracted.name || 'Candidate';
+            const skillsStr = (extracted.skills || []).slice(0, 4).join(', ');
+            window.showToast(`✨ AI Extracted Profile for ${name}! Skills: ${skillsStr}`, 'success');
+
+            // Update user profile in sidebar
+            const userNameEl = document.getElementById('user-name');
+            const userEmailEl = document.getElementById('user-email');
+            const userAvatarEl = document.getElementById('user-avatar');
+            if (userNameEl && extracted.name) userNameEl.textContent = extracted.name;
+            if (userEmailEl && extracted.email) userEmailEl.textContent = extracted.email;
+            if (userAvatarEl && extracted.name) {
+                userAvatarEl.textContent = extracted.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            }
+
+            navigate();
+        });
+    }
+
     navigate();
 });

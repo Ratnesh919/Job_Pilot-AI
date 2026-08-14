@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onNewNotification: (callback) => {
     ipcRenderer.on('new-notification', (_, data) => callback(data));
   },
+  onResumeExtracted: (callback) => {
+    ipcRenderer.on('resume-extracted', (_, data) => callback(data));
+  },
 
   // AI Command Agent
   executeAiPrompt: (prompt) => ipcRenderer.invoke('execute-ai-prompt', prompt),
