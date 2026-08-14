@@ -14,7 +14,10 @@ window.AiAgentPage = {
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <button id="ai-clear-chat-btn" style="background: transparent; border: 1px solid #232d42; color: #94a3b8; font-size: 12px; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444'" onmouseout="this.style.borderColor='#232d42'; this.style.color='#94a3b8'">Clear Chat</button>
+                        <button id="ai-change-settings-mode-btn" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(139, 92, 246, 0.2)); border: 1px solid #f59e0b60; color: #fbbf24; font-size: 12px; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.borderColor='#fbbf24'; this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='#f59e0b60'; this.style.transform='none'">
+                            <span>⚙️ Change Settings via AI</span>
+                        </button>
+                        <button id="ai-clear-chat-btn" style="background: transparent; border: 1px solid #232d42; color: #94a3b8; font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444'" onmouseout="this.style.borderColor='#232d42'; this.style.color='#94a3b8'">Clear Chat</button>
                         <span style="font-size: 11px; color: #10b981; background: #10b98115; border: 1px solid #10b98130; padding: 4px 10px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px;">
                             <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981;"></span>
                             Llama-3.3-70B Active
@@ -29,6 +32,15 @@ window.AiAgentPage = {
 
                 <!-- Prompt Input Bar -->
                 <div style="background: #141a29; border: 1px solid #232d42; border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+                    <!-- Mode Indicator Pill (Hidden by default) -->
+                    <div id="ai-mode-indicator" style="display: none; align-items: center; justify-content: space-between; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: #fbbf24;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                            <span>⚙️ Settings Update Mode Active</span>
+                            <span style="color: #cbd5e1; font-weight: normal;">— Tell AI what locations, roles, or preferences to update</span>
+                        </div>
+                        <button id="ai-cancel-mode-btn" style="background: transparent; border: none; color: #94a3b8; font-size: 12px; cursor: pointer;" title="Cancel settings mode">✕ Cancel</button>
+                    </div>
+
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="text" id="ai-prompt-input" placeholder="Give instruction to AI (e.g. 'Change my location to London and add React Developer', 'Apply to 5 jobs on LinkedIn')..." style="flex-grow: 1; padding: 11px 14px; background: #0c101a; border: 1px solid #232d42; color: #fff; border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#232d42'">
                         <button id="ai-send-btn" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; padding: 11px 18px; font-weight: 600; font-size: 13px; border-radius: 8px; flex-shrink: 0;">
@@ -46,6 +58,11 @@ window.AiAgentPage = {
         const input = document.getElementById('ai-prompt-input');
         const sendBtn = document.getElementById('ai-send-btn');
         const clearBtn = document.getElementById('ai-clear-chat-btn');
+        const changeSettingsBtn = document.getElementById('ai-change-settings-mode-btn');
+        const modeIndicator = document.getElementById('ai-mode-indicator');
+        const cancelModeBtn = document.getElementById('ai-cancel-mode-btn');
+
+        let isSettingsMode = false;
 
         if (!window.appState.chatHistory) {
             try {
@@ -81,6 +98,45 @@ window.AiAgentPage = {
             `;
             stream.appendChild(div);
             bindChips();
+        }
+
+        function triggerSettingsPrompt() {
+            isSettingsMode = true;
+            if (modeIndicator) modeIndicator.style.display = 'flex';
+            if (input) {
+                input.placeholder = "⚙️ Settings Mode: Tell AI what to change (e.g. 'Set target location to New York & Remote and add React Dev')...";
+                input.focus();
+            }
+
+            const div = document.createElement('div');
+            div.style.cssText = 'display: flex; gap: 12px; align-items: flex-start; animation: slideUp 0.25s ease-out;';
+            div.innerHTML = `
+                <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b60; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">⚙️</div>
+                <div style="background: #0c101a; border: 1px solid #f59e0b50; border-radius: 10px; padding: 14px 18px; max-width: 85%; color: #e2e8f0; font-size: 13px; line-height: 1.5; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">
+                    <div style="font-weight: 700; color: #fbbf24; font-size: 14px; margin-bottom: 4px;">⚙️ AI Settings Assistant: What would you like to update?</div>
+                    <p style="font-size: 12px; color: #cbd5e1; margin: 0 0 10px 0;">
+                        Tell me what configuration or preference you want to modify, or click any option below:
+                    </p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        <button class="ai-chip" data-prompt="Change my target location to London and Bengaluru, and include remote opportunities" style="background: #141a29; border: 1px solid #10b981; color: #34d399; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">📍 Update Locations</button>
+                        <button class="ai-chip" data-prompt="Add Full Stack Developer, AI Engineer, and Python Developer to my target roles" style="background: #141a29; border: 1px solid #3b82f6; color: #60a5fa; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">🎯 Update Target Roles</button>
+                        <button class="ai-chip" data-prompt="Set mode to Fresher (0-1 Yrs)" style="background: #141a29; border: 1px solid #8b5cf6; color: #c4b5fd; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">🎓 Switch to Fresher</button>
+                        <button class="ai-chip" data-prompt="Set mode to Experienced (1-3 Yrs)" style="background: #141a29; border: 1px solid #8b5cf6; color: #c4b5fd; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">💼 Switch to Experienced</button>
+                        <button class="ai-chip" data-prompt="Set bot max applications per run to 15 and delay to 3000ms" style="background: #141a29; border: 1px solid #f59e0b; color: #fbbf24; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">⚡ Adjust Bot Limits & Delay</button>
+                    </div>
+                </div>
+            `;
+            stream.appendChild(div);
+            stream.scrollTop = stream.scrollHeight;
+            bindChips();
+        }
+
+        function cancelSettingsMode() {
+            isSettingsMode = false;
+            if (modeIndicator) modeIndicator.style.display = 'none';
+            if (input) {
+                input.placeholder = "Give instruction to AI (e.g. 'Change my location to London and add React Developer', 'Apply to 5 jobs on LinkedIn')...";
+            }
         }
 
         function renderAllSavedMessages() {
@@ -192,6 +248,7 @@ window.AiAgentPage = {
             const text = input.value.trim();
             if (!text) return;
             input.value = '';
+            cancelSettingsMode();
             appendUserMessageUI(text, true);
 
             const thinkingDiv = document.createElement('div');
@@ -226,6 +283,8 @@ window.AiAgentPage = {
             }
         }
 
+        changeSettingsBtn?.addEventListener('click', triggerSettingsPrompt);
+        cancelModeBtn?.addEventListener('click', cancelSettingsMode);
         sendBtn?.addEventListener('click', handleSend);
         input?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') handleSend();
