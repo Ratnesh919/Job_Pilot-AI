@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import asyncio
+import subprocess
 from datetime import datetime
 
 # Fix Windows cp1252 encoding crash on emoji characters
@@ -75,15 +76,32 @@ async def run_all_in_one_auto_bot(api_key=None, provider="openrouter", headless=
         except Exception as e:
             print(f"Portal automation notice for {role}: {e}", flush=True)
 
-    # STEP 2: Company Careers Websites & Multi-Portal Scraper (Foundit, Monster, Workday, Greenhouse)
-    for idx, role in enumerate(TARGET_ROLES[:4]):
-        print(f"\n=======================================================", flush=True)
-        print(f"   [STAGE 2/3] COMPANY WEBSITE FORM AUTO-FILLER: {role.upper()}", flush=True)
-        print(f"=======================================================", flush=True)
+    # STEP 2: AI Company Website Applier (browser-use AI agent — needs Python 3.11)
+    print(f"\n=======================================================", flush=True)
+    print(f"   [STAGE 2/3] AI COMPANY WEBSITE APPLIER (browser-use)", flush=True)
+    print(f"   Fills any form, uploads resume, handles multi-step", flush=True)
+    print(f"=======================================================", flush=True)
+    ai_applier_script = os.path.join(BACKEND_DIR, "ai_company_applier.py")
+    for role in TARGET_ROLES[:3]:
         try:
-            await run_company_website_and_multi_portal_bot(keyword=role, headless=headless)
+            # Run under py -3.11 because browser-use needs Python 3.11+
+            py311 = "py"
+            result = subprocess.run(
+                [py311, "-3.11", ai_applier_script, role, "2"],
+                timeout=300,   # 5 min per role
+                capture_output=False,
+            )
+            if result.returncode != 0:
+                # Fallback: try classic company_site_applier
+                await run_company_website_and_multi_portal_bot(keyword=role, headless=headless)
+        except FileNotFoundError:
+            print(f"   py -3.11 not found, using classic company applier...", flush=True)
+            try:
+                await run_company_website_and_multi_portal_bot(keyword=role, headless=headless)
+            except Exception as e:
+                print(f"Company website notice for {role}: {e}", flush=True)
         except Exception as e:
-            print(f"Company website automation notice for {role}: {e}", flush=True)
+            print(f"AI company applier notice for {role}: {e}", flush=True)
 
     # STEP 3: LLM Unlisted Job Finder & Gmail Direct Email Dispatcher with Resume.pdf
     print(f"\n=======================================================", flush=True)
