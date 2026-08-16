@@ -266,7 +266,153 @@ async def send_recruiter_direct_email(recipient_email: str, job_title: str, comp
             return True
     except Exception as e:
         print(f"      [EMAIL ERROR] Could not dispatch to {recipient_email}: {e}", flush=True)
-    return False
+# ── LinkedIn Easy Apply Modal Solver ──────────────────────────────────────────
+async def solve_linkedin_easy_apply_modal(page, job_title: str) -> bool:
+    """
+    Intelligently handles all steps of LinkedIn's Easy Apply modal:
+      1. Contact info (phone number, email)
+      2. Resume selection (selects active resume or uploads Resume.pdf)
+      3. Screening questions (Numeric experience, Notice period, Salary, Yes/No radios, Dropdowns)
+      4. Review step (unchecks Follow company, clicks Submit application)
+      5. Post-submission confirmation dismiss
+    """
+    modal_sel = "div.jobs-easy-apply-modal, div[data-test-modal], div[role='dialog']"
+    submitted = False
+
+    for step in range(10):  # max 10 steps
+        await page.wait_for_timeout(400)
+
+        # ── 1. Check for Submit Application button ──
+        submit_btn = await page.query_selector("button[aria-label='Submit application'], button:has-text('Submit application')")
+        if submit_btn and await submit_btn.is_visible():
+            try:
+                follow_chk = await page.query_selector("label:has-text('Follow'), input[type='checkbox'][id*='follow']")
+                if follow_chk:
+                    is_checked = await page.evaluate("el => el.checked", follow_chk)
+                    if is_checked:
+                        await follow_chk.click()
+            except Exception:
+                pass
+
+            await submit_btn.click()
+            print("      -> Clicked [Submit application] on LinkedIn! 🎉", flush=True)
+            await page.wait_for_timeout(1500)
+            submitted = True
+            break
+
+        # ── 2. Contact Info Phone Number ──
+        phone_input = await page.query_selector("input[id*='phoneNumber'], input[name*='phone'], input[placeholder*='phone']")
+        if phone_input and await phone_input.is_visible():
+            val = await phone_input.input_value()
+            if not val.strip():
+                clean_phone = USER_PHONE.replace("+91 ", "").replace(" ", "").replace("+91", "")
+                await phone_input.fill(clean_phone)
+
+        # ── 3. Resume Selection & Upload ──
+        resume_cards = await page.query_selector_all(".jobs-document-upload__title, label[for*='resume'], div[data-test-document-upload], input[type='radio'][value*='resume' i]")
+        if resume_cards:
+            try:
+                await resume_cards[0].click()
+            except Exception:
+                pass
+        else:
+            file_input = await page.query_selector("input[type='file']")
+            if file_input and os.path.exists(RESUME_PDF_PATH):
+                try:
+                    await file_input.set_input_files(RESUME_PDF_PATH)
+                    print(f"      -> Uploaded Resume.pdf to LinkedIn", flush=True)
+                    await page.wait_for_timeout(600)
+                except Exception:
+                    pass
+
+        # ── 4. Screening Questions ──
+        # A. Text / Number Inputs
+        inputs = await page.query_selector_all(f"{modal_sel} input[type='text'], {modal_sel} input[type='number'], {modal_sel} textarea")
+        for inp in inputs:
+            try:
+                if not await inp.is_visible():
+                    continue
+                cur_val = await inp.input_value()
+                if not cur_val.strip():
+                    lbl_text = await page.evaluate("""el => {
+                        const lbl = el.closest('div.fb-dash-form-element')?.querySelector('label') ||
+                                    el.closest('div')?.querySelector('label') ||
+                                    document.querySelector(`label[for="${el.id}"]`);
+                        return lbl ? lbl.innerText.toLowerCase() : (el.getAttribute('aria-label') || '').toLowerCase();
+                    }""", inp)
+
+                    if any(w in lbl_text for w in ["experience", "years", "how many"]):
+                        await inp.fill("1")
+                    elif any(w in lbl_text for w in ["ctc", "salary", "compensation", "expected"]):
+                        await inp.fill("350000")
+                    elif any(w in lbl_text for w in ["notice", "days", "joining"]):
+                        await inp.fill("0")
+                    elif any(w in lbl_text for w in ["gpa", "percentage", "cgpa"]):
+                        await inp.fill("8.5")
+                    elif any(w in lbl_text for w in ["city", "location"]):
+                        await inp.fill("Kolkata")
+                    else:
+                        await inp.fill("1")
+            except Exception:
+                pass
+
+        # B. Radio buttons (Yes / No)
+        radio_groups = await page.query_selector_all(f"{modal_sel} fieldset, {modal_sel} div[data-test-form-builder-radio-button-form-component]")
+        for group in radio_groups:
+            try:
+                legend_text = await page.evaluate("el => el.innerText.toLowerCase()", group)
+                if any(w in legend_text for w in ["sponsorship", "visa", "require sponsorship", "criminal"]):
+                    no_radio = await group.query_selector("label:has-text('No'), input[value='No'], input[value='false']")
+                    if no_radio:
+                        await no_radio.click()
+                else:
+                    yes_radio = await group.query_selector("label:has-text('Yes'), input[value='Yes'], input[value='true']")
+                    if yes_radio:
+                        await yes_radio.click()
+            except Exception:
+                pass
+
+        # C. Dropdown / Select fields
+        selects = await page.query_selector_all(f"{modal_sel} select")
+        for sel in selects:
+            try:
+                cur_val = await sel.input_value()
+                if not cur_val or cur_val == "Select an option":
+                    options = await page.evaluate("el => Array.from(el.options).map(o => o.value).filter(v => v && v !== 'Select an option')", sel)
+                    if options:
+                        await sel.select_option(value=options[0])
+            except Exception:
+                pass
+
+        # ── 5. Advance Step (Next / Review) ──
+        advanced = await safe_click(page, [
+            "button[aria-label='Review your application']",
+            "button[aria-label='Continue to next step']",
+            "button:has-text('Review')",
+            "button:has-text('Next')",
+            "button:has-text('Continue')",
+        ], label=f"LinkedIn Step {step+1}", timeout=2000)
+
+        if not advanced:
+            # Check if Submit appeared without Next
+            submit_btn = await page.query_selector("button[aria-label='Submit application'], button:has-text('Submit application')")
+            if submit_btn and await submit_btn.is_visible():
+                await submit_btn.click()
+                print("      -> Clicked [Submit application] on LinkedIn! 🎉", flush=True)
+                await page.wait_for_timeout(1500)
+                submitted = True
+            break
+
+    # Dismiss post-submission confirmation
+    if submitted:
+        await page.wait_for_timeout(600)
+        await safe_click(page, [
+            "button[aria-label='Dismiss']",
+            "button:has-text('Done')",
+            "button:has-text('Not now')",
+        ], label="LinkedIn Dismiss", timeout=1800)
+
+    return submitted
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -752,71 +898,23 @@ async def auto_apply_linkedin(context, keyword="Software Engineer", location="In
                     await jp.close()
                     continue
 
-                await jp.wait_for_timeout(2500)
+                await jp.wait_for_timeout(1500)
 
-                # Walk through LinkedIn's multi-step modal
-                actually_submitted = False
-                for step in range(8):
-                    # Check for final Submit
-                    if await safe_click(jp, [
-                        "button[aria-label='Submit application']",
-                        "button:has-text('Submit application')",
-                        "button[aria-label*='Submit application']",
-                    ], label="LinkedIn Final Submit", timeout=4000):
-                        actually_submitted = True
-                        break
-
-                    # Pre-fill phone if needed
-                    await fill_if_empty(jp,
-                        "input[id*='phoneNumber'], input[name*='phone'], input[placeholder*='phone']",
-                        USER_PHONE.replace("+91 ", "").replace(" ", ""))
-
-                    # Handle "Follow company" checkbox — uncheck it
-                    try:
-                        follow_chk = await jp.query_selector(
-                            "label:has-text('Follow'), input[type='checkbox'][id*='follow']")
-                        if follow_chk:
-                            is_checked = await jp.evaluate(
-                                "el => el.checked",
-                                await jp.query_selector("input[type='checkbox'][id*='follow']") or follow_chk)
-                            if is_checked:
-                                await follow_chk.click()
-                    except Exception:
-                        pass
-
-                    # Next / Review / Continue
-                    advanced = await safe_click(jp, [
-                        "button[aria-label='Continue to next step']",
-                        "button[aria-label='Review your application']",
-                        "button:has-text('Next')",
-                        "button:has-text('Review')",
-                        "button:has-text('Continue to next step')",
-                        "button:has-text('Review your application')",
-                    ], label=f"LinkedIn Step {step+1}", timeout=4000)
-
-                    if not advanced:
-                        break
-                    await jp.wait_for_timeout(2000)
-
-                # Dismiss any post-submission dialog
-                await safe_click(jp, [
-                    "button[aria-label='Dismiss']",
-                    "button:has-text('Done')",
-                    "button:has-text('Not now')",
-                ], label="LinkedIn Dismiss", timeout=3000)
+                # Solve full LinkedIn Easy Apply multi-step modal
+                actually_submitted = await solve_linkedin_easy_apply_modal(jp, title)
 
                 if actually_submitted:
                     log_applied("LinkedIn", company, title, loc, job_url)
-                    print(f"      >>> [APPLIED] '{title}' @ '{company}' on LinkedIn! Check LinkedIn messages for confirmation.", flush=True)
+                    print(f"      >>> [APPLIED] '{title}' @ '{company}' on LinkedIn! Check LinkedIn for confirmation.", flush=True)
                     applied += 1
-                else:
-                    print(f"      -> Could not reach Submit step. Skipping (NOT counting as applied).", flush=True)
+                elif not emailed_hr:
+                    print(f"      -> Could not reach final Submit step on modal. Skipping.", flush=True)
 
             except Exception as e:
                 print(f"      [ERROR] {e}", flush=True)
             finally:
                 await jp.close()
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
 
     except Exception as e:
         print(f"[LINKEDIN ERROR] {e}", flush=True)
@@ -890,7 +988,7 @@ async def run_portal_automation(portal_choice="all", keyword="Software Engineer"
                 ),
                 viewport=None,
                 ignore_https_errors=True,
-                slow_mo=120,
+                slow_mo=20,
             )
             print("[BROWSER] Launched bot Chrome profile (isolated from your main Chrome).", flush=True)
         except Exception as e:

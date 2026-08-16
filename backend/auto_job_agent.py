@@ -68,9 +68,9 @@ async def run_all_in_one_auto_bot(api_key=None, provider="openrouter", headless=
         return
 
     # STEP 1: Run Multi-Role Auto-Applier on Portals (LinkedIn + Indeed + Naukri)
-    for idx, role in enumerate(TARGET_ROLES[:6]):
+    for idx, role in enumerate(TARGET_ROLES[:2]):
         print(f"\n=======================================================", flush=True)
-        print(f"   [STAGE 1/3] PORTAL AUTO-APPLYING FOR: {role.upper()}", flush=True)
+        print(f"   [STAGE 1/4] PORTAL AUTO-APPLYING FOR: {role.upper()}", flush=True)
         print(f"=======================================================", flush=True)
         try:
             await run_portal_automation(portal_choice="all", keyword=role, headless=headless)
@@ -79,17 +79,17 @@ async def run_all_in_one_auto_bot(api_key=None, provider="openrouter", headless=
 
     # STEP 2: AI Company Website Applier (browser-use AI agent — needs Python 3.11)
     print(f"\n=======================================================", flush=True)
-    print(f"   [STAGE 2/3] AI COMPANY WEBSITE APPLIER (browser-use)", flush=True)
+    print(f"   [STAGE 2/4] AI COMPANY WEBSITE APPLIER (browser-use)", flush=True)
     print(f"   Fills any form, uploads resume, handles multi-step", flush=True)
     print(f"=======================================================", flush=True)
     ai_applier_script = os.path.join(BACKEND_DIR, "ai_company_applier.py")
-    for role in TARGET_ROLES[:3]:
+    for role in TARGET_ROLES[:1]:
         try:
             # Run under py -3.11 because browser-use needs Python 3.11+
             py311 = "py"
             result = subprocess.run(
                 [py311, "-3.11", ai_applier_script, role, "2"],
-                timeout=300,   # 5 min per role
+                timeout=120,   # 2 min max
                 capture_output=False,
             )
             if result.returncode != 0:
@@ -106,12 +106,12 @@ async def run_all_in_one_auto_bot(api_key=None, provider="openrouter", headless=
 
     # STEP 2B: DOM Deep Form Filler — company career pages (Playwright DOM introspection)
     print(f"\n=======================================================", flush=True)
-    print(f"   [STAGE 2B/4] DOM COMPANY APPLIER (Deep Form Introspection)", flush=True)
+    print(f"   [STAGE 3/4] DOM COMPANY APPLIER (Deep Form Introspection)", flush=True)
     print(f"   Reads any form DOM, fills all fields, uploads Resume.pdf", flush=True)
     print(f"=======================================================", flush=True)
-    for role in TARGET_ROLES[:3]:
+    for role in TARGET_ROLES[:1]:
         try:
-            await run_dom_applier(keyword=role, max_companies=3, headless=headless)
+            await run_dom_applier(keyword=role, max_companies=2, headless=headless)
         except Exception as e:
             print(f"DOM applier notice for {role}: {e}", flush=True)
 

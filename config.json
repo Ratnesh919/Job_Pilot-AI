@@ -1,68 +1,63 @@
 {
   "candidate": {
-    "name": "Your Full Name",
-    "email": "your_email@gmail.com",
-    "phone": "+1 (555) 000-0000",
-    "location": "New York, NY / Remote",
-    "portfolio": "https://yourportfolio.dev",
-    "linkedin": "https://linkedin.com/in/yourprofile",
-    "github": "https://github.com/yourusername",
-    "figma": "",
-    "notice_period": "Immediate / 2 Weeks",
+    "name": "Ratnesh Kumar Singh",
+    "email": "kumarsinghratnesh3@gmail.com",
+    "phone": "+91 70049 37129",
+    "location": "Kolkata, West Bengal, India",
+    "portfolio": "https://gmail.com",
+    "linkedin": "https://tinyurl.com/2st86aht",
+    "figma": "https://tinyurl.com/2c5nksav",
+    "notice_period": "Immediate / 0 Days",
     "experience_years": "0-1",
-    "degree": "B.S. / B.Tech in Computer Science / Engineering",
+    "degree": "B.Tech in Electronics & Communication Engineering (2026)",
     "skills": [
       "Python",
-      "JavaScript",
-      "TypeScript",
-      "React",
-      "Node.js",
-      "REST APIs",
-      "SQL",
-      "Git",
-      "Docker",
-      "AI & LLM Prompting"
+      "C",
+      "REST API",
+      "OpenAI",
+      "HTML",
+      "CSS"
     ]
   },
   "api_keys": {
     "openrouter": "",
-    "nvidia": "",
-    "gemini": ""
+    "nvidia": ""
   },
   "email": {
-    "sender": "your_email@gmail.com",
-    "app_password": ""
+    "sender": "kumarsinghratnesh3@gmail.com",
+    "app_password": "wgwzylnuiidwkosh"
   },
   "browser": {
     "chrome_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "user_data_path": "",
+    "user_data_path": "C:\\Users\\akssi\\AppData\\Local\\Google\\Chrome\\User Data",
     "headless": true
   },
   "target_roles": [
-    "Software Engineer",
     "Python Developer",
+    "Software Engineer",
     "Frontend Developer",
+    "AI Developer",
+    "UI UX Designer",
     "Full Stack Developer",
-    "Backend Developer",
-    "AI / ML Engineer",
-    "Data Analyst",
-    "UI/UX Designer"
+    "n8n Automation Developer",
+    "Electronics Engineer"
   ],
   "bot_settings": {
     "max_per_run": 10,
     "delay_ms": 2000,
-    "retry_count": 3,
-    "enable_desktop_notifications": true
+    "retry_count": 3
   },
   "experience_level": "fresher",
   "preferred_locations": [
-    "Remote",
-    "New York",
-    "San Francisco",
+    "Kolkata",
     "Bengaluru",
-    "London"
+    "Remote"
   ],
-  "primary_location": "Remote",
+  "primary_location": "Kolkata",
   "include_remote": true,
-  "resume_path": "./Resume.pdf"
+  "resume_path": "c:\\Users\\akssi\\Desktop\\cv\\Resume.pdf",
+  "api_key_file": "C:\\Users\\akssi\\Desktop\\api_key.txt",
+  "keywords": [
+    "Web Developer"
+  ]
 }
