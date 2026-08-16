@@ -797,53 +797,94 @@ async def auto_apply_indeed(context, keyword="Software Engineer", location="Indi
     applied = 0
     jobs    = []
 
+    # Inject anti-detection stealth script
     try:
-        # Use India Indeed
-        indeed_url = (
-            f"https://in.indeed.com/jobs"
-            f"?q={urllib.parse.quote(search_term)}"
-            f"&l={urllib.parse.quote(location)}"
-            f"&fromage=7"          # jobs from last 7 days
-        )
-        print(f"[INDEED] Search: {indeed_url}", flush=True)
-        await page.goto(indeed_url, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(4000)
+        await page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            window.navigator.chrome = { runtime: {} };
+        """)
+    except Exception:
+        pass
 
-        # Indeed 2024 card selectors
-        cards = await page.query_selector_all(
-            "div.job_seen_beacon, "
-            "td.resultContent, "
-            "li.css-5lfssm, "
-            "div[data-testid='slider_item']"
-        )
-        print(f"[INDEED] Found {len(cards)} job cards.", flush=True)
+    try:
+        kw_slug = search_term.lower().replace(" ", "-")
+        search_urls = [
+            f"https://in.indeed.com/jobs?q={urllib.parse.quote(search_term)}&l={urllib.parse.quote(location)}",
+            f"https://in.indeed.com/q-{kw_slug}-jobs.html",
+            f"https://www.indeed.com/jobs?q={urllib.parse.quote(search_term)}&l={urllib.parse.quote(location)}",
+        ]
 
-        for card in cards[:10]:
+        for s_url in search_urls:
+            print(f"[INDEED] Search: {s_url}", flush=True)
             try:
-                title_el = await card.query_selector(
-                    "h2.jobTitle a, "
-                    "a.jcs-JobTitle, "
-                    "a[data-testid='job-title'], "
-                    "a[id*='job_']"
-                )
-                comp_el = await card.query_selector(
-                    "span[data-testid='company-name'], "
-                    "span.companyName, "
-                    "[class*='companyName']"
-                )
-                if not title_el:
-                    continue
-                title   = (await title_el.text_content() or "").strip()
-                company = (await comp_el.text_content() or "Indeed Employer").strip() if comp_el else "Indeed Employer"
-                href    = await title_el.get_attribute("href") or ""
-                jk      = await title_el.get_attribute("data-jk")
-                url     = f"https://in.indeed.com/viewjob?jk={jk}" if jk else (
-                          "https://in.indeed.com" + href if href.startswith("/") else href)
+                await page.goto(s_url, wait_until="domcontentloaded", timeout=25000)
+                await page.wait_for_timeout(3000)
 
-                if title and len(title) > 3 and not any(j["url"] == url for j in jobs):
-                    jobs.append({"title": title, "company": company, "url": url, "loc": location})
-            except Exception:
-                pass
+                # Check for Cloudflare Challenge / Turnstile Checkbox
+                for attempt in range(15):
+                    cur_title = (await page.title()).lower()
+                    if "just a moment" in cur_title or "security check" in cur_title or "challenge" in page.url.lower():
+                        await show_browser_hud(page, "Solving Indeed Human Verification (up to 30s)...")
+                        if attempt == 0:
+                            print("\n" + "="*65, flush=True)
+                            print("  [INDEED HUMAN VERIFICATION DETECTED]", flush=True)
+                            print("  Please check the 'Verify you are human' box in the Chrome window if prompted.", flush=True)
+                            print("  Waiting up to 30 seconds for verification to clear...", flush=True)
+                            print("="*65 + "\n", flush=True)
+
+                        # Attempt auto-click on Turnstile frames
+                        for frame in page.frames:
+                            try:
+                                if "challenges.cloudflare.com" in frame.url or "turnstile" in frame.url:
+                                    box = await frame.query_selector("input[type='checkbox'], .ctp-checkbox-label, #challenge-stage, .cb-i")
+                                    if box:
+                                        await box.click()
+                                        print("  -> Auto-clicked Cloudflare Turnstile box!", flush=True)
+                                        await page.wait_for_timeout(2000)
+                                        break
+                            except Exception:
+                                pass
+
+                        await asyncio.sleep(2)
+                    else:
+                        break
+
+                # Extract jobs using comprehensive DOM evaluate
+                extracted = await page.evaluate("""() => {
+                    const results = [];
+                    const seen = new Set();
+
+                    document.querySelectorAll('a.jcs-JobTitle, a[data-jk], h2.jobTitle a, a[id^="job_"], a[href*="/viewjob"], a[href*="/rc/clk"]').forEach(a => {
+                        const title = a.innerText.trim();
+                        const jk = a.getAttribute('data-jk') || (a.id.startsWith('job_') ? a.id.replace('job_', '') : '');
+                        const href = a.href || '';
+
+                        let card = a.closest('div.job_seen_beacon') || a.closest('div.cardOutline') || a.closest('li') || a.closest('td.resultContent') || a.closest('div[data-testid="slider_item"]') || a.closest('div');
+                        let company = "Indeed Employer";
+                        if (card) {
+                            const cEl = card.querySelector('[data-testid="company-name"], .companyName, span[class*="companyName"], span.css-63koeb');
+                            if (cEl) company = cEl.innerText.trim();
+                        }
+
+                        let finalUrl = jk ? `https://in.indeed.com/viewjob?jk=${jk}` : (href.includes('viewjob') || href.includes('/rc/clk') ? href : '');
+                        if (title && title.length > 2 && finalUrl && !seen.has(finalUrl)) {
+                            seen.add(finalUrl);
+                            results.push({title, company, url: finalUrl});
+                        }
+                    });
+
+                    return results;
+                }""")
+
+                if extracted:
+                    for item in extracted:
+                        item["loc"] = location
+                        if not any(j["url"] == item["url"] for j in jobs):
+                            jobs.append(item)
+                    print(f"[INDEED] Successfully found {len(jobs)} jobs!", flush=True)
+                    break
+            except Exception as e:
+                print(f"[INDEED SEARCH NOTICE] {e}", flush=True)
 
         print(f"[INDEED] Processing {min(len(jobs), 5)} jobs.", flush=True)
 
