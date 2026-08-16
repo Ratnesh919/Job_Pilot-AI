@@ -584,12 +584,31 @@ async def run_portal_automation(portal_choice="all", keyword="Software Engineer"
 
     total_applied = 0
 
+    # ── Bot-specific Chrome profile ─────────────────────────────────────────
+    # We CANNOT use the main Chrome profile while Chrome is open (profile lock).
+    # Solution: use a dedicated bot profile dir and copy Cookies from main profile.
+    BOT_PROFILE_DIR = os.path.join(APP_ROOT, "data", "bot_chrome_profile")
+    COOKIE_SRC = os.path.join(user_data_path, "Default", "Cookies")
+    BOT_COOKIE_DST = os.path.join(BOT_PROFILE_DIR, "Default", "Cookies")
+    
+    # Copy Cookies file from user's profile so bot inherits login sessions
+    if os.path.exists(COOKIE_SRC):
+        import shutil
+        os.makedirs(os.path.join(BOT_PROFILE_DIR, "Default"), exist_ok=True)
+        try:
+            shutil.copy2(COOKIE_SRC, BOT_COOKIE_DST)
+            print("[BROWSER] Copied login cookies to bot profile.", flush=True)
+        except Exception as e:
+            print(f"[BROWSER] Could not copy Cookies ({e}). Bot may need login.", flush=True)
+    else:
+        print("[BROWSER] Main Chrome Cookies not found — bot will start fresh (may need login).", flush=True)
+
     async with async_playwright() as p:
         context = None
         try:
-            # Use user's real Chrome profile (already logged in to LinkedIn, Naukri, Indeed)
+            # Try using the dedicated bot profile (won't conflict with running Chrome)
             context = await p.chromium.launch_persistent_context(
-                user_data_dir=user_data_path,
+                user_data_dir=BOT_PROFILE_DIR,
                 executable_path=chrome_exe if os.path.exists(chrome_exe) else None,
                 headless=headless,
                 args=[
@@ -598,6 +617,8 @@ async def run_portal_automation(portal_choice="all", keyword="Software Engineer"
                     "--disable-blink-features=AutomationControlled",
                     "--disable-infobars",
                     "--start-maximized",
+                    "--disable-session-crashed-bubble",
+                    "--disable-features=TranslateUI",
                 ],
                 ignore_default_args=["--enable-automation"],
                 user_agent=(
@@ -605,26 +626,35 @@ async def run_portal_automation(portal_choice="all", keyword="Software Engineer"
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/127.0.0.0 Safari/537.36"
                 ),
-                viewport=None,   # use maximized window
+                viewport=None,
                 ignore_https_errors=True,
-                slow_mo=120,     # slight delay makes it more human-like
+                slow_mo=120,
             )
-            print("[BROWSER] Launched with your Chrome profile (logged-in sessions preserved).", flush=True)
+            print("[BROWSER] Launched bot Chrome profile (isolated from your main Chrome).", flush=True)
         except Exception as e:
-            print(f"[BROWSER] Persistent context failed ({e}), falling back to incognito...", flush=True)
-            browser = await p.chromium.launch(
-                executable_path=chrome_exe if os.path.exists(chrome_exe) else None,
-                headless=headless,
-                args=["--no-first-run", "--disable-blink-features=AutomationControlled"],
-            )
-            context = await browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/127.0.0.0 Safari/537.36"
-                ),
-            )
-            print("[BROWSER WARNING] Not using saved login session — you may need to log in.", flush=True)
+            print(f"[BROWSER] Bot profile launch failed ({e}). Using Playwright Chromium fallback...", flush=True)
+            try:
+                # Playwright's bundled Chromium — always works, no conflicts
+                browser = await p.chromium.launch(
+                    headless=headless,
+                    args=[
+                        "--no-first-run",
+                        "--disable-blink-features=AutomationControlled",
+                        "--start-maximized",
+                    ],
+                    ignore_default_args=["--enable-automation"],
+                )
+                context = await browser.new_context(
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/127.0.0.0 Safari/537.36"
+                    ),
+                )
+                print("[BROWSER] Using Playwright's built-in Chromium. You may need to log in.", flush=True)
+            except Exception as e2:
+                print(f"[BROWSER FATAL] Cannot launch any browser: {e2}", flush=True)
+                return 0
 
         try:
             locations = [target_location]
