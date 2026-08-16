@@ -13,6 +13,15 @@ except Exception:
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_ROOT = os.path.dirname(BACKEND_DIR)
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+if APP_ROOT not in sys.path:
+    sys.path.insert(0, APP_ROOT)
+
+from portal_auto_applier import run_portal_automation
+from company_site_applier import run_company_website_and_multi_portal_bot
+from llm_job_finder import run_llm_email_job_search_and_apply
+
 CONFIG_PATH = os.path.join(APP_ROOT, "config.json")
 
 def load_config():
@@ -36,15 +45,6 @@ async def run_master_agent():
     print(f"   Mode: [{exp_mode.upper()}]  |  Primary Location: [{prim_loc}]", flush=True)
     print(f"   Browser: [{'Headless Background' if headless_mode else 'Headed Visible'}]", flush=True)
     print("=======================================================\n", flush=True)
-
-    try:
-        from portal_auto_applier import run_portal_automation
-        from company_site_applier import run_company_website_and_multi_portal_bot
-        from llm_job_finder import run_llm_email_job_search_and_apply
-    except ImportError:
-        from .portal_auto_applier import run_portal_automation
-        from .company_site_applier import run_company_website_and_multi_portal_bot
-        from .llm_job_finder import run_llm_email_job_search_and_apply
 
     roles_to_run = target_roles[:3] if target_roles else ["Software Engineer"]
 

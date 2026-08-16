@@ -24,17 +24,17 @@ try:
 except Exception:
     pass
 
-try:
-    from db_helper import record_application, is_already_applied
-    from llm_job_finder import call_low_latency_llm_cover_letter
-    from email_sender import send_application_email
-except ImportError:
-    from .db_helper import record_application, is_already_applied
-    from .llm_job_finder import call_low_latency_llm_cover_letter
-    from .email_sender import send_application_email
-
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_ROOT = os.path.dirname(BACKEND_DIR)
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+if APP_ROOT not in sys.path:
+    sys.path.insert(0, APP_ROOT)
+
+from db_helper import record_application, is_already_applied
+from llm_job_finder import call_low_latency_llm_cover_letter
+from email_sender import send_application_email
+
 CONFIG_PATH = os.path.join(APP_ROOT, "config.json")
 DATA_DIR = os.path.join(APP_ROOT, "data")
 DEFAULT_RESUME = os.path.join(APP_ROOT, "Resume.pdf")
