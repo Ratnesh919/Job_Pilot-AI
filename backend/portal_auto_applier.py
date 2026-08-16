@@ -93,10 +93,11 @@ def log_applied(platform, company, title, loc, job_url):
 
 
 async def show_browser_hud(page, text: str):
-    """Injects a real-time floating status badge in the open browser so you can watch live progress."""
+    """Injects a real-time floating status badge & virtual cursor in the open browser so you can watch live progress."""
     try:
         clean_text = text.replace("'", "\\'").replace('"', '\\"')
         await page.evaluate(f"""() => {{
+            // HUD
             let hud = document.getElementById('applybot-live-hud');
             if (!hud) {{
                 hud = document.createElement('div');
@@ -119,22 +120,79 @@ async def show_browser_hud(page, text: str):
                 document.body.appendChild(hud);
             }}
             hud.innerHTML = '🤖 <span style="color:#ffffff; font-weight:700;">ApplyBot Pro:</span> ' + '{clean_text}';
+
+            // Virtual Mouse Pointer
+            let cur = document.getElementById('applybot-virtual-cursor');
+            if (!cur) {{
+                cur = document.createElement('div');
+                cur.id = 'applybot-virtual-cursor';
+                cur.style.position = 'fixed';
+                cur.style.width = '18px';
+                cur.style.height = '18px';
+                cur.style.borderRadius = '50%';
+                cur.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
+                cur.style.border = '2px solid #ffffff';
+                cur.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.8), inset 0 0 4px #fff';
+                cur.style.pointerEvents = 'none';
+                cur.style.zIndex = '999999999';
+                cur.style.transform = 'translate(-50%, -50%)';
+                cur.style.transition = 'all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                cur.style.left = '50vw';
+                cur.style.top = '50vh';
+                document.body.appendChild(cur);
+            }}
         }}""")
     except Exception:
         pass
 
 
+async def move_cursor_to_element(page, el):
+    """Smoothly moves the virtual visual cursor and Playwright mouse to the center of an element."""
+    try:
+        box = await el.bounding_box()
+        if box:
+            cx = box["x"] + box["width"] / 2
+            cy = box["y"] + box["height"] / 2
+            # Move visual cursor via JS
+            await page.evaluate(f"""() => {{
+                let cur = document.getElementById('applybot-virtual-cursor');
+                if (cur) {{
+                    cur.style.left = '{cx}px';
+                    cur.style.top = '{cy}px';
+                    cur.style.transform = 'translate(-50%, -50%) scale(1.3)';
+                    setTimeout(() => {{ if (cur) cur.style.transform = 'translate(-50%, -50%) scale(1.0)'; }}, 200);
+                }}
+            }}""")
+            # Move Playwright OS mouse
+            await page.mouse.move(cx, cy, steps=6)
+            await page.wait_for_timeout(100)
+    except Exception:
+        pass
+
+
+async def smooth_scroll_page(page, amount=350):
+    """Performs a smooth human-like page scroll."""
+    try:
+        await page.evaluate(f"""() => {{
+            window.scrollBy({{ top: {amount}, behavior: 'smooth' }});
+        }}""")
+        await page.wait_for_timeout(300)
+    except Exception:
+        pass
+
+
 async def safe_click(page, selectors, label="button", timeout=6000):
-    """Try each selector, scroll into view, visibly highlight in green, and click in real-time."""
+    """Try each selector, scroll into view, animate cursor to target, and click in real-time."""
     for sel in selectors:
         try:
             el = await page.wait_for_selector(sel, timeout=timeout, state="visible")
             if el:
                 await el.scroll_into_view_if_needed()
-                # Real-time visual click highlight
+                await move_cursor_to_element(page, el)
+                # Visual click glow
                 try:
                     await page.evaluate("el => { el.style.outline = '3px solid #10b981'; el.style.boxShadow = '0 0 16px #10b981aa'; }", el)
-                    await page.wait_for_timeout(180)
+                    await page.wait_for_timeout(150)
                     await page.evaluate("el => { el.style.outline = 'none'; el.style.boxShadow = 'none'; }", el)
                 except Exception:
                     pass
@@ -147,13 +205,14 @@ async def safe_click(page, selectors, label="button", timeout=6000):
 
 
 async def fill_if_empty(page, selector, value):
-    """Fill a field with real-time human keystrokes and visible field focus outline."""
+    """Fill a field with visual cursor movement, human keystrokes, and visible focus outline."""
     try:
         el = await page.query_selector(selector)
         if el and await el.is_visible():
             cur = await el.input_value()
             if not cur.strip():
                 await el.scroll_into_view_if_needed()
+                await move_cursor_to_element(page, el)
                 # Highlight active field in blue
                 await page.evaluate("el => { el.style.outline = '2px solid #3b82f6'; el.style.boxShadow = '0 0 10px #3b82f666'; }", el)
                 await el.click()

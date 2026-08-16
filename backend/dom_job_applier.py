@@ -243,6 +243,80 @@ async def get_all_inputs(page: Page) -> list[dict]:
         return []
 
 
+async def show_browser_hud(page, text: str):
+    """Injects a real-time floating status badge & virtual cursor in the open browser."""
+    try:
+        clean_text = text.replace("'", "\\'").replace('"', '\\"')
+        await page.evaluate(f"""() => {{
+            let hud = document.getElementById('applybot-live-hud');
+            if (!hud) {{
+                hud = document.createElement('div');
+                hud.id = 'applybot-live-hud';
+                hud.style.position = 'fixed';
+                hud.style.bottom = '24px';
+                hud.style.right = '24px';
+                hud.style.backgroundColor = '#0f172a';
+                hud.style.color = '#38bdf8';
+                hud.style.padding = '12px 20px';
+                hud.style.borderRadius = '12px';
+                hud.style.border = '1px solid #38bdf8';
+                hud.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
+                hud.style.zIndex = '999999999';
+                hud.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                hud.style.fontSize = '14px';
+                hud.style.fontWeight = '600';
+                hud.style.pointerEvents = 'none';
+                hud.style.transition = 'all 0.3s ease';
+                document.body.appendChild(hud);
+            }}
+            hud.innerHTML = '🤖 <span style="color:#ffffff; font-weight:700;">ApplyBot Pro:</span> ' + '{clean_text}';
+
+            let cur = document.getElementById('applybot-virtual-cursor');
+            if (!cur) {{
+                cur = document.createElement('div');
+                cur.id = 'applybot-virtual-cursor';
+                cur.style.position = 'fixed';
+                cur.style.width = '18px';
+                cur.style.height = '18px';
+                cur.style.borderRadius = '50%';
+                cur.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
+                cur.style.border = '2px solid #ffffff';
+                cur.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.8), inset 0 0 4px #fff';
+                cur.style.pointerEvents = 'none';
+                cur.style.zIndex = '999999999';
+                cur.style.transform = 'translate(-50%, -50%)';
+                cur.style.transition = 'all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                cur.style.left = '50vw';
+                cur.style.top = '50vh';
+                document.body.appendChild(cur);
+            }}
+        }}""")
+    except Exception:
+        pass
+
+
+async def move_cursor_to_element(page, el):
+    """Smoothly moves the virtual visual cursor and Playwright mouse to the center of an element."""
+    try:
+        box = await el.bounding_box()
+        if box:
+            cx = box["x"] + box["width"] / 2
+            cy = box["y"] + box["height"] / 2
+            await page.evaluate(f"""() => {{
+                let cur = document.getElementById('applybot-virtual-cursor');
+                if (cur) {{
+                    cur.style.left = '{cx}px';
+                    cur.style.top = '{cy}px';
+                    cur.style.transform = 'translate(-50%, -50%) scale(1.3)';
+                    setTimeout(() => {{ if (cur) cur.style.transform = 'translate(-50%, -50%) scale(1.0)'; }}, 200);
+                }}
+            }}""")
+            await page.mouse.move(cx, cy, steps=6)
+            await page.wait_for_timeout(80)
+    except Exception:
+        pass
+
+
 def match_field_value(field: dict) -> str | None:
     """
     Given a field's metadata, return the best matching candidate value.
@@ -369,6 +443,7 @@ async def fill_form_via_dom(page: Page, job_title: str = "") -> int:
                 if value:
                     try:
                         await el.scroll_into_view_if_needed()
+                        await move_cursor_to_element(page, el)
                         # Real-time visual focus outline
                         await page.evaluate("el => { el.style.outline = '2px solid #38bdf8'; el.style.boxShadow = '0 0 12px #38bdf888'; }", el)
                         await el.click()
