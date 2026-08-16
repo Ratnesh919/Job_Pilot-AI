@@ -1237,17 +1237,30 @@ async def run_portal_automation(portal_choice="all", keyword="Software Engineer"
     COOKIE_SRC = os.path.join(user_data_path, "Default", "Cookies")
     BOT_COOKIE_DST = os.path.join(BOT_PROFILE_DIR, "Default", "Cookies")
     
-    # Copy Cookies file from user's profile so bot inherits login sessions
+    # Copy Cookies & Extensions from user's main Chrome profile to bot profile
+    import shutil
+    os.makedirs(os.path.join(BOT_PROFILE_DIR, "Default"), exist_ok=True)
     if os.path.exists(COOKIE_SRC):
-        import shutil
-        os.makedirs(os.path.join(BOT_PROFILE_DIR, "Default"), exist_ok=True)
         try:
             shutil.copy2(COOKIE_SRC, BOT_COOKIE_DST)
-            print("[BROWSER] Copied login cookies to bot profile.", flush=True)
+            print("[BROWSER] Synced login cookies to bot profile.", flush=True)
         except Exception as e:
-            print(f"[BROWSER] Could not copy Cookies ({e}). Bot may need login.", flush=True)
-    else:
-        print("[BROWSER] Main Chrome Cookies not found — bot will start fresh (may need login).", flush=True)
+            print(f"[BROWSER] Could not sync Cookies ({e}).", flush=True)
+
+    # Sync installed Chrome extensions (Simplify, Buster, CapSolver, uBlock, LetMeApply)
+    src_ext_dir = os.path.join(user_data_path, "Default", "Extensions")
+    dst_ext_dir = os.path.join(BOT_PROFILE_DIR, "Default", "Extensions")
+    if os.path.exists(src_ext_dir):
+        os.makedirs(dst_ext_dir, exist_ok=True)
+        for ext_id in os.listdir(src_ext_dir):
+            s_ext = os.path.join(src_ext_dir, ext_id)
+            d_ext = os.path.join(dst_ext_dir, ext_id)
+            if os.path.isdir(s_ext) and not os.path.exists(d_ext):
+                try:
+                    shutil.copytree(s_ext, d_ext)
+                except Exception:
+                    pass
+        print("[BROWSER] Chrome Extensions (Simplify Copilot, Buster, CapSolver, LetMeApply) loaded into bot!", flush=True)
 
     async with async_playwright() as p:
         context = None
@@ -1263,6 +1276,7 @@ async def run_portal_automation(portal_choice="all", keyword="Software Engineer"
                     "--disable-blink-features=AutomationControlled",
                     "--disable-infobars",
                     "--start-maximized",
+                    "--enable-extensions",
                     "--disable-session-crashed-bubble",
                     "--disable-features=TranslateUI",
                 ],
