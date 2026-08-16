@@ -463,6 +463,142 @@ async def solve_linkedin_easy_apply_modal(page, job_title: str) -> bool:
     return submitted
 
 
+# ── External Company Website Applier & HR Email Scraper ──────────────────────
+async def apply_external_company_site_or_email(context, original_page, company_name: str, job_title: str, job_url: str = "") -> bool:
+    """
+    When no in-portal Easy Apply button exists:
+      1. Detects & follows external 'Apply on company website' link / button.
+      2. Selects position/designation dropdown, fills form fields, uploads Resume.pdf, and submits.
+      3. If form cannot be submitted: crawls company website & Contact/Careers pages for HR emails and dispatches tailored email.
+    """
+    print(f"      🌐 [COMPANY SITE] Checking external application for '{job_title}' @ '{company_name}'...", flush=True)
+    company_page = None
+
+    try:
+        external_selectors = [
+            "a:has-text('Apply on company website')",
+            "a:has-text('Apply on employer site')",
+            "a:has-text('Apply on company site')",
+            "button:has-text('Apply on company website')",
+            "a:has-text('Apply externally')",
+            "a:has-text('Company Site')",
+            "a[href*='apply']:not([href*='linkedin']):not([href*='naukri']):not([href*='indeed'])",
+            "a.apply-button",
+        ]
+
+        target_url = None
+        for sel in external_selectors:
+            try:
+                el = await original_page.query_selector(sel)
+                if el and await el.is_visible():
+                    href = await el.get_attribute("href")
+                    if href and href.startswith("http") and not any(p in href for p in ["linkedin.com", "naukri.com", "indeed.com"]):
+                        target_url = href
+                        break
+            except Exception:
+                pass
+
+        if target_url:
+            company_page = await context.new_page()
+            await company_page.goto(target_url, wait_until="domcontentloaded", timeout=25000)
+            await company_page.wait_for_timeout(2000)
+        else:
+            try:
+                async with original_page.expect_popup(timeout=4000) as popup_info:
+                    await safe_click(original_page, external_selectors, label="External Apply Link", timeout=3000)
+                company_page = await popup_info.value
+                await company_page.wait_for_load_state("domcontentloaded")
+            except Exception:
+                company_page = original_page
+
+        if not company_page:
+            company_page = original_page
+
+        await show_browser_hud(company_page, f"Checking Form on {company_name}...")
+
+        # Step 1: Try Deep DOM Form Filling & Resume Upload on Company Page
+        try:
+            from dom_job_applier import walk_form_steps, fill_form_via_dom
+            # Select Designation / Position dropdown if present
+            try:
+                pos_selects = await company_page.query_selector_all("select[name*='position' i], select[name*='role' i], select[name*='designation' i], select[id*='job' i]")
+                for p_sel in pos_selects:
+                    if await p_sel.is_visible():
+                        opts = await company_page.evaluate("el => Array.from(el.options).map(o => ({text: o.text, val: o.value}))", p_sel)
+                        for opt in opts:
+                            if any(w in opt["text"].lower() for w in job_title.lower().split() if len(w) > 3):
+                                await p_sel.select_option(value=opt["val"])
+                                print(f"      [DOM] Selected Designation: '{opt['text']}'", flush=True)
+                                break
+            except Exception:
+                pass
+
+            # Walk multi-step form & submit
+            submitted = await walk_form_steps(company_page, job_title)
+            if submitted:
+                print(f"      >>> [APPLIED] Successfully submitted application on {company_name} website!", flush=True)
+                log_applied(f"Company Website ({company_name})", company_name, job_title, "Online", job_url or company_page.url)
+                return True
+        except Exception as e:
+            print(f"      [DOM FORM NOTICE] {e}", flush=True)
+
+        # Step 2: Fallback — Crawl Company Website for HR / Careers Email
+        print(f"      🔍 [SCRAPING HR EMAIL] Searching {company_name} website for HR/Careers email...", flush=True)
+        await show_browser_hud(company_page, f"Scraping HR email for {company_name}...")
+
+        page_html = await company_page.content()
+        hr_emails = extract_recruiter_emails(page_html)
+
+        if not hr_emails:
+            contact_links = await company_page.evaluate("""() => {
+                const links = [];
+                document.querySelectorAll('a[href]').forEach(a => {
+                    const h = a.href.toLowerCase();
+                    if (h.includes('contact') || h.includes('career') || h.includes('about') || h.includes('jobs') || h.startsWith('mailto:')) {
+                        links.push(a.href);
+                    }
+                });
+                return [...new Set(links)].slice(0, 3);
+            }""")
+
+            for c_link in contact_links:
+                if c_link.startswith("mailto:"):
+                    raw_mail = c_link.replace("mailto:", "").split("?")[0].strip()
+                    if raw_mail and "@" in raw_mail:
+                        hr_emails.append(raw_mail)
+                else:
+                    try:
+                        aux_page = await context.new_page()
+                        await aux_page.goto(c_link, wait_until="domcontentloaded", timeout=12000)
+                        aux_text = await aux_page.content()
+                        found = extract_recruiter_emails(aux_text)
+                        if found:
+                            hr_emails.extend(found)
+                        await aux_page.close()
+                    except Exception:
+                        pass
+                if hr_emails:
+                    break
+
+        if hr_emails:
+            for hr_mail in hr_emails[:2]:
+                if not is_already_applied(company_name, job_title, recruiter_email=hr_mail):
+                    sent = await send_recruiter_direct_email(hr_mail, job_title, company_name, job_url)
+                    if sent:
+                        return True
+
+    except Exception as e:
+        print(f"      [EXTERNAL APPLY NOTICE] {e}", flush=True)
+    finally:
+        if company_page and company_page != original_page:
+            try:
+                await company_page.close()
+            except Exception:
+                pass
+
+    return False
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. NAUKRI
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -603,7 +739,11 @@ async def auto_apply_naukri(context, keyword="Software Engineer", location="Indi
                 ], label="Naukri Apply", timeout=5000)
 
                 if not clicked and not emailed_hr:
-                    print(f"      -> No Apply button or HR email found. Skipping.", flush=True)
+                    ext_applied = await apply_external_company_site_or_email(context, jp, company, title, job_url)
+                    if ext_applied:
+                        applied += 1
+                    else:
+                        print(f"      -> No Apply button, external form, or HR email found. Skipping.", flush=True)
                     await jp.close()
                     continue
 
@@ -743,12 +883,11 @@ async def auto_apply_indeed(context, keyword="Software Engineer", location="Indi
                 ], label="Indeed Apply", timeout=6000)
 
                 if not clicked and not emailed_hr:
-                    print(f"      -> No Apply button or HR email found. Skipping.", flush=True)
-                    await jp.close()
-                    continue
-
-                if not clicked and emailed_hr:
-                    print(f"      -> Applied directly via HR email. Closing job tab.", flush=True)
+                    ext_applied = await apply_external_company_site_or_email(context, jp, company, title, job_url)
+                    if ext_applied:
+                        applied += 1
+                    else:
+                        print(f"      -> No Apply button, external form, or HR email found. Skipping.", flush=True)
                     await jp.close()
                     continue
 
@@ -937,12 +1076,11 @@ async def auto_apply_linkedin(context, keyword="Software Engineer", location="In
                 ], label="LinkedIn Easy Apply", timeout=7000)
 
                 if not clicked and not emailed_hr:
-                    print(f"      -> No Easy Apply button or HR email found. Skipping.", flush=True)
-                    await jp.close()
-                    continue
-
-                if not clicked and emailed_hr:
-                    print(f"      -> Applied directly via HR email. Closing job tab.", flush=True)
+                    ext_applied = await apply_external_company_site_or_email(context, jp, company, title, job_url)
+                    if ext_applied:
+                        applied += 1
+                    else:
+                        print(f"      -> No Easy Apply button, external form, or HR email found. Skipping.", flush=True)
                     await jp.close()
                     continue
 
