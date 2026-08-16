@@ -119,6 +119,69 @@ async def fill_if_empty(page, selector, value):
         pass
 
 
+async def wait_for_login_if_needed(page, portal_name: str, max_wait_seconds: int = 180) -> bool:
+    """
+    Detects if the current page is a login wall.
+    If so, prints a clear message and waits up to max_wait_seconds for the user to log in.
+    Returns True if logged in (or not a login wall), False if timed out.
+    """
+    LOGIN_INDICATORS = [
+        "a:has-text('Login')",
+        "a:has-text('Log in')",
+        "a:has-text('Sign in')",
+        "button:has-text('Login')",
+        "button:has-text('Log in')",
+        "button:has-text('Sign In')",
+        "input[name='username']",
+        "input[name='email'][placeholder*='mail']",
+        "form[action*='login']",
+        "form[action*='signin']",
+    ]
+    NOT_LOGGED_IN_URLS = ["login", "signin", "sign-in", "nlogin", "authwall", "checkpoint/lg"]
+
+    async def is_login_page():
+        try:
+            url = page.url.lower()
+            if any(kw in url for kw in NOT_LOGGED_IN_URLS):
+                return True
+            for sel in LOGIN_INDICATORS[:4]:
+                try:
+                    el = await page.query_selector(sel)
+                    if el and await el.is_visible():
+                        return True
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return False
+
+    if not await is_login_page():
+        return True  # Already logged in or no login wall
+
+    # Print a prominent login prompt
+    print(f"\n{'!'*60}", flush=True)
+    print(f"  [LOGIN REQUIRED] {portal_name} is showing a login page.", flush=True)
+    print(f"  Please log into {portal_name} in the browser window.", flush=True)
+    print(f"  Bot will wait up to {max_wait_seconds} seconds...", flush=True)
+    print(f"{'!'*60}\n", flush=True)
+
+    waited = 0
+    check_interval = 5   # check every 5 seconds
+    while waited < max_wait_seconds:
+        await asyncio.sleep(check_interval)
+        waited += check_interval
+        if not await is_login_page():
+            print(f"  [LOGIN] {portal_name}: Logged in! ✓ Continuing...", flush=True)
+            await page.wait_for_timeout(2000)
+            return True
+        remaining = max_wait_seconds - waited
+        if waited % 30 == 0 and remaining > 0:
+            print(f"  [LOGIN] Still waiting for {portal_name} login... ({remaining}s left)", flush=True)
+
+    print(f"  [LOGIN] Timed out waiting for {portal_name} login. Skipping.", flush=True)
+    return False
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. NAUKRI
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -136,6 +199,40 @@ async def auto_apply_naukri(context, keyword="Software Engineer", location="Indi
     jobs    = []
 
     try:
+        # ── Check Naukri Login status before running search loop ──
+        print("[NAUKRI] Verifying login status...", flush=True)
+        try:
+            await page.goto("https://www.naukri.com/mnjuser/profile", timeout=20000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(2500)
+            cur_u = page.url.lower()
+            if "nlogin" in cur_u or "login" in cur_u or "register" in cur_u:
+                print("\n" + "="*65, flush=True)
+                print("  [NAUKRI LOGIN REQUIRED]", flush=True)
+                print("  Please log into your Naukri account in the opened Chrome window.", flush=True)
+                print("  (Login via Google or Password. Once logged in, the bot continues automatically).", flush=True)
+                print("  Waiting up to 180 seconds...", flush=True)
+                print("="*65 + "\n", flush=True)
+                if "nlogin" not in cur_u:
+                    await page.goto("https://www.naukri.com/nlogin/login", timeout=15000)
+
+                logged_in = False
+                for i in range(36):  # 36 * 5s = 180s
+                    await asyncio.sleep(5)
+                    u = page.url.lower()
+                    if "nlogin" not in u and "login" not in u and "naukri.com" in u:
+                        print("  [NAUKRI] Logged in successfully! ✓ Proceeding with applications...", flush=True)
+                        logged_in = True
+                        await page.wait_for_timeout(2000)
+                        break
+                    if (i+1) % 6 == 0:
+                        print(f"  [NAUKRI] Waiting for login... ({180 - (i+1)*5}s left)", flush=True)
+                if not logged_in:
+                    print("  [NAUKRI NOTICE] Login timed out. Continuing with available jobs...", flush=True)
+            else:
+                print("[NAUKRI] Login verified! ✓", flush=True)
+        except Exception as e:
+            print(f"[NAUKRI] Login check error: {e}", flush=True)
+
         search_urls = [
             f"https://www.naukri.com/{kw_slug}-jobs-in-{loc_slug}",
             f"https://www.naukri.com/jobs?k={urllib.parse.quote(search_term)}&l={urllib.parse.quote(location)}",
@@ -415,6 +512,40 @@ async def auto_apply_linkedin(context, keyword="Software Engineer", location="In
     jobs    = []
 
     try:
+        # ── Check LinkedIn login status ──
+        print("[LINKEDIN] Verifying login status...", flush=True)
+        try:
+            await page.goto("https://www.linkedin.com/feed/", timeout=20000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(2500)
+            u = page.url.lower()
+            if "login" in u or "authwall" in u or "checkpoint" in u or "feed" not in u:
+                print("\n" + "="*65, flush=True)
+                print("  [LINKEDIN LOGIN REQUIRED]", flush=True)
+                print("  Please log into LinkedIn in the opened Chrome window.", flush=True)
+                print("  (Sign in with your email/password. Once in feed, bot proceeds automatically).", flush=True)
+                print("  Waiting up to 180 seconds...", flush=True)
+                print("="*65 + "\n", flush=True)
+                if "login" not in u:
+                    await page.goto("https://www.linkedin.com/login", timeout=15000)
+
+                logged_in = False
+                for i in range(36):
+                    await asyncio.sleep(5)
+                    curr = page.url.lower()
+                    if "feed" in curr or ("linkedin.com" in curr and "login" not in curr and "authwall" not in curr):
+                        print("  [LINKEDIN] Logged in successfully! ✓ Proceeding with Easy Apply...", flush=True)
+                        logged_in = True
+                        await page.wait_for_timeout(2000)
+                        break
+                    if (i+1) % 6 == 0:
+                        print(f"  [LINKEDIN] Waiting for login... ({180 - (i+1)*5}s left)", flush=True)
+                if not logged_in:
+                    print("  [LINKEDIN NOTICE] Login timed out. Continuing with available search...", flush=True)
+            else:
+                print("[LINKEDIN] Login verified! ✓", flush=True)
+        except Exception as e:
+            print(f"[LINKEDIN] Login check error: {e}", flush=True)
+
         f_exp    = "&f_E=1%2C2" if EXP_LEVEL == "fresher" else ""
         li_url   = (
             f"https://www.linkedin.com/jobs/search/"

@@ -77,7 +77,8 @@ DEGREE          = C.get("degree", "B.Tech in Electronics & Communication Enginee
 SKILLS          = ", ".join(C.get("skills", ["Python", "AI", "REST API"]))
 OPENROUTER_KEY  = cfg.get("api_keys", {}).get("openrouter", "")
 CHROME_EXE      = cfg.get("browser", {}).get("chrome_path", r"C:\Program Files\Google\Chrome\Application\chrome.exe")
-CHROME_DATA     = cfg.get("browser", {}).get("user_data_path", r"C:\Users\akssi\AppData\Local\Google\Chrome\User Data")
+BOT_PROFILE     = os.path.join(DATA_DIR, "bot_chrome_profile")
+CHROME_DATA     = BOT_PROFILE
 
 # ── Target companies with careers pages ───────────────────────────────────────
 # These are real company careers portals — the AI agent will navigate each one

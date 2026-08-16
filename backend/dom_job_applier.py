@@ -107,7 +107,8 @@ CANDIDATE = {
 }
 
 CHROME_EXE  = cfg.get("browser", {}).get("chrome_path",    r"C:\Program Files\Google\Chrome\Application\chrome.exe")
-CHROME_DATA = cfg.get("browser", {}).get("user_data_path",  r"C:\Users\akssi\AppData\Local\Google\Chrome\User Data")
+BOT_PROFILE = os.path.join(DATA_DIR, "bot_chrome_profile")
+CHROME_DATA = BOT_PROFILE
 OR_KEY      = cfg.get("api_keys", {}).get("openrouter", "")
 
 # ── Field-to-value mapping rules ──────────────────────────────────────────────

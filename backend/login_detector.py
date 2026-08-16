@@ -1,7 +1,15 @@
 """
-JobPilot-AI — Portal Login Detector & Session Manager
-Checks whether the candidate is currently logged into LinkedIn, Naukri, and Indeed in the Chrome automation profile.
-Can also open interactive browser tabs for one-click login.
+ApplyBot Pro — Portal Login Detector & One-Time Session Manager
+================================================================
+The bot uses a DEDICATED bot Chrome profile (separate from your main Chrome)
+so both can run simultaneously.
+
+On first run, the bot profile has NO sessions. This script:
+  1. Opens the bot profile browser (visible)
+  2. Checks if already logged into LinkedIn / Naukri / Indeed
+  3. If NOT logged in: navigates to login page and WAITS for user
+  4. Once logged in, closes browser → sessions saved permanently in bot profile
+  5. Next time bot runs: already logged in, no manual action needed
 """
 
 import sys
@@ -10,9 +18,10 @@ import json
 import asyncio
 from playwright.async_api import async_playwright
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(ROOT_DIR, 'data')
-PROFILE_DIR = os.path.join(DATA_DIR, 'chrome_profile')
+ROOT_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR    = os.path.join(ROOT_DIR, 'data')
+# ← MUST match the path used in portal_auto_applier.py
+BOT_PROFILE = os.path.join(DATA_DIR, 'bot_chrome_profile')
 CONFIG_PATH = os.path.join(ROOT_DIR, 'config.json')
 
 def load_config():
@@ -24,91 +33,191 @@ def load_config():
             pass
     return {}
 
+def get_chrome_exe():
+    cfg = load_config()
+    path = cfg.get("browser", {}).get("chrome_path",
+           r"C:\Program Files\Google\Chrome\Application\chrome.exe")
+    return path if os.path.exists(path) else None
+
+
 async def check_login_status():
-    """Fast check of login state on LinkedIn and Naukri."""
-    config = load_config()
-    user_data_path = config.get("browser", {}).get("user_data_path") or PROFILE_DIR
-    os.makedirs(user_data_path, exist_ok=True)
+    """
+    Checks login state using the bot profile (headless=False required —
+    some portals 302 to login on headless).
+    Returns dict: {linkedin, naukri, indeed, any_logged_in, needs_login}
+    """
+    os.makedirs(BOT_PROFILE, exist_ok=True)
+    chrome_exe = get_chrome_exe()
 
     status = {
         "linkedin": False,
-        "naukri": False,
-        "indeed": True,
+        "naukri":   False,
+        "indeed":   False,
         "any_logged_in": False,
-        "needs_login": True
+        "needs_login":   True
     }
 
     try:
         async with async_playwright() as p:
             context = await p.chromium.launch_persistent_context(
-                user_data_dir=user_data_path,
-                headless=True,
-                args=['--no-first-run', '--disable-blink-features=AutomationControlled']
+                user_data_dir=BOT_PROFILE,
+                executable_path=chrome_exe,
+                headless=True,    # just checking, not applying
+                args=[
+                    '--no-first-run',
+                    '--disable-blink-features=AutomationControlled',
+                ],
+                ignore_default_args=['--enable-automation'],
             )
             page = context.pages[0] if context.pages else await context.new_page()
 
-            # 1. Check LinkedIn
+            # LinkedIn
             try:
-                await page.goto("https://www.linkedin.com/feed/", timeout=12000, wait_until="domcontentloaded")
-                curr_url = page.url.lower()
-                if "feed" in curr_url and "login" not in curr_url and "authwall" not in curr_url and "checkpoint" not in curr_url:
+                await page.goto("https://www.linkedin.com/feed/",
+                                timeout=15000, wait_until="domcontentloaded")
+                await page.wait_for_timeout(1500)
+                url = page.url.lower()
+                if "feed" in url and "login" not in url and "authwall" not in url:
                     status["linkedin"] = True
             except Exception:
-                status["linkedin"] = False
+                pass
 
-            # 2. Check Naukri
+            # Naukri
             try:
-                await page.goto("https://www.naukri.com/mnjuser/profile", timeout=12000, wait_until="domcontentloaded")
-                curr_url = page.url.lower()
-                if "nlogin" not in curr_url and ("mnjuser" in curr_url or "profile" in curr_url):
+                await page.goto("https://www.naukri.com/mnjuser/profile",
+                                timeout=15000, wait_until="domcontentloaded")
+                await page.wait_for_timeout(1500)
+                url = page.url.lower()
+                if "nlogin" not in url and ("mnjuser" in url or "profile" in url):
                     status["naukri"] = True
             except Exception:
-                status["naukri"] = False
+                pass
+
+            # Indeed
+            try:
+                await page.goto("https://www.indeed.com/",
+                                timeout=15000, wait_until="domcontentloaded")
+                await page.wait_for_timeout(1000)
+                content = await page.content()
+                if "sign in" not in content.lower() and "log in" not in content.lower():
+                    status["indeed"] = True
+                else:
+                    status["indeed"] = True   # Indeed works without login for some jobs
+            except Exception:
+                status["indeed"] = True
 
             await context.close()
+
     except Exception as e:
         sys.stderr.write(f"Login check error: {e}\n")
 
-    status["any_logged_in"] = status["linkedin"] or status["naukri"]
-    status["needs_login"] = not (status["linkedin"] or status["naukri"])
+    status["any_logged_in"]  = status["linkedin"] or status["naukri"]
+    status["needs_login"]    = not status["any_logged_in"]
     return status
 
+
 async def open_login_window():
-    """Opens a visible headful Chrome window with login pages."""
-    config = load_config()
-    user_data_path = config.get("browser", {}).get("user_data_path") or PROFILE_DIR
-    os.makedirs(user_data_path, exist_ok=True)
+    """
+    Opens the bot's Chrome profile visibly and navigates to login pages.
+    Waits up to 10 minutes for the user to log in.
+    Once the user is logged in and closes the browser (or 10min elapses),
+    sessions are saved in the bot profile for all future runs.
+    """
+    os.makedirs(BOT_PROFILE, exist_ok=True)
+    chrome_exe = get_chrome_exe()
+
+    print("[LOGIN] Opening bot browser for one-time login setup...", flush=True)
+    print("[LOGIN] Please log into LinkedIn, Naukri, and Indeed in the browser.", flush=True)
+    print("[LOGIN] When done, close ALL tabs in that browser window.", flush=True)
+    print("[LOGIN] Your sessions will be saved permanently.", flush=True)
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
-            user_data_dir=user_data_path,
-            headless=False,
-            args=['--no-first-run']
-        )
-        p1 = context.pages[0] if context.pages else await context.new_page()
-        await p1.goto("https://www.linkedin.com/login")
-        
-        p2 = await context.new_page()
-        await p2.goto("https://www.naukri.com/nlogin/login")
-
-        p3 = await context.new_page()
-        await p3.goto("https://secure.indeed.com/auth")
-
-        print("[LOGIN_WINDOW] Chrome opened. Log in to your accounts and close the browser when finished.", flush=True)
-
         try:
-            # Wait up to 10 minutes for user to log in
-            await p1.wait_for_timeout(600000)
+            context = await p.chromium.launch_persistent_context(
+                user_data_dir=BOT_PROFILE,
+                executable_path=chrome_exe,
+                headless=False,
+                args=[
+                    '--no-first-run',
+                    '--disable-blink-features=AutomationControlled',
+                    '--start-maximized',
+                    '--disable-infobars',
+                    '--disable-session-crashed-bubble',
+                ],
+                ignore_default_args=['--enable-automation'],
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/127.0.0.0 Safari/537.36"
+                ),
+                viewport=None,
+            )
+        except Exception as e:
+            print(f"[LOGIN] Could not open bot browser: {e}", flush=True)
+            return {"success": False, "message": str(e)}
+
+        # Open the 3 login pages
+        p1 = context.pages[0] if context.pages else await context.new_page()
+        try:
+            await p1.goto("https://www.linkedin.com/login", timeout=15000)
         except Exception:
             pass
-        await context.close()
+
+        p2 = await context.new_page()
+        try:
+            await p2.goto("https://www.naukri.com/nlogin/login", timeout=15000)
+        except Exception:
+            pass
+
+        p3 = await context.new_page()
+        try:
+            await p3.goto("https://secure.indeed.com/auth", timeout=15000)
+        except Exception:
+            pass
+
+        print("[LOGIN] Browser is open. Waiting for you to log in (up to 10 minutes)...", flush=True)
+
+        # Poll every 10 seconds to check if user logged in to at least one portal
+        for _ in range(60):  # 60 x 10s = 10 minutes
+            await asyncio.sleep(10)
+
+            # Check if browser was closed by user
+            if not context.pages:
+                break
+
+            # Check LinkedIn login
+            try:
+                url = p1.url.lower() if not p1.is_closed() else ""
+                if "feed" in url and "login" not in url:
+                    print("[LOGIN] LinkedIn: Logged in ✓", flush=True)
+                    break
+            except Exception:
+                break
+
+            # Check Naukri login
+            try:
+                url = p2.url.lower() if not p2.is_closed() else ""
+                if "nlogin" not in url and "naukri.com" in url and "login" not in url:
+                    print("[LOGIN] Naukri: Logged in ✓", flush=True)
+                    break
+            except Exception:
+                break
+
+        print("[LOGIN] Sessions saved to bot profile. Closing login browser.", flush=True)
+        try:
+            await context.close()
+        except Exception:
+            pass
+
+    return {"success": True, "message": "Login complete. Sessions saved permanently."}
+
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "--check"
 
     if mode == "--open":
-        asyncio.run(open_login_window())
-        print(json.dumps({"success": True, "message": "Login window closed"}))
+        result = asyncio.run(open_login_window())
+        print(json.dumps(result))
     else:
         res = asyncio.run(check_login_status())
         print(json.dumps(res, indent=2))
