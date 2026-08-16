@@ -182,6 +182,93 @@ async def wait_for_login_if_needed(page, portal_name: str, max_wait_seconds: int
     return False
 
 
+# ── HR Recruiter Email Extractor & Direct Dispatcher ──────────────────────────
+def extract_recruiter_emails(text: str) -> list[str]:
+    """
+    Scans job descriptions for recruiter / HR email addresses.
+    Filters out system, CDN, support, and domain placeholder emails.
+    """
+    if not text:
+        return []
+
+    raw_emails = re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
+
+    IGNORED_DOMAINS = [
+        'naukri.com', 'naukimg.com', 'indeed.com', 'indeedemail.com',
+        'linkedin.com', 'licdn.com', 'google.com',
+        'example.com', 'sentry.io', 'w3.org', 'schema.org', 'github.com',
+        'apple.com', 'microsoft.com', 'adobe.com', 'cloudflare.com',
+        'playwright.dev', 'electronjs.org', 'npmjs.com'
+    ]
+    IGNORED_PREFIXES = [
+        'noreply', 'no-reply', 'donotreply', 'support', 'help', 'privacy',
+        'security', 'terms', 'feedback', 'abuse', 'contact-us', 'info@naukri',
+        'mailer', 'postmaster', 'admin@naukri', 'alert', 'notification',
+        'jobseeker', 'billing', 'sales'
+    ]
+
+    valid = []
+    for em in raw_emails:
+        em_clean = em.lower().strip('.').strip(',').strip(';').strip(':').strip(')')
+        if '@' not in em_clean:
+            continue
+        parts = em_clean.split('@')
+        if len(parts) != 2:
+            continue
+        user, domain = parts[0], parts[1]
+
+        if any(d in domain for d in IGNORED_DOMAINS):
+            continue
+        if any(user.startswith(p) for p in IGNORED_PREFIXES):
+            continue
+        if '.' not in domain or len(domain.split('.')[-1]) < 2:
+            continue
+
+        if em_clean not in valid:
+            valid.append(em_clean)
+
+    return valid
+
+
+async def send_recruiter_direct_email(recipient_email: str, job_title: str, company: str, job_url: str = "") -> bool:
+    """
+    Dispatches a professional application email with Resume.pdf attached
+    directly to the HR/recruiter email discovered in the job posting.
+    """
+    try:
+        from email_sender import send_job_application_email
+        domain_type = "software"
+        title_lower = job_title.lower()
+        if any(w in title_lower for w in ["electronics", "hardware", "embedded", "iot", "vlsi", "core", "cad"]):
+            domain_type = "core"
+        elif any(w in title_lower for w in ["ui", "ux", "designer", "frontend"]):
+            domain_type = "software"
+
+        print(f"      📧 [HR EMAIL FOUND] Recruiter contact: {recipient_email}", flush=True)
+        print(f"      -> Sending tailored application email + Resume.pdf + Portfolio links...", flush=True)
+        success = send_job_application_email(
+            recipient_email=recipient_email,
+            role_title=job_title,
+            company_name=company,
+            domain_type=domain_type,
+            resume_type="software" if domain_type == "software" else "core"
+        )
+        if success:
+            print(f"      >>> [EMAIL SENT] Successfully emailed HR at '{recipient_email}' for '{job_title}' @ '{company}'!", flush=True)
+            record_application(
+                platform="Recruiter Direct Email",
+                company=company,
+                role=job_title,
+                status="Applied",
+                recruiter_email=recipient_email,
+                notes=f"HR email extracted from job listing ({job_url})"
+            )
+            return True
+    except Exception as e:
+        print(f"      [EMAIL ERROR] Could not dispatch to {recipient_email}: {e}", flush=True)
+    return False
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. NAUKRI
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -298,7 +385,18 @@ async def auto_apply_naukri(context, keyword="Software Engineer", location="Indi
                 await jp.goto(job_url, wait_until="domcontentloaded", timeout=25000)
                 await jp.wait_for_timeout(2500)
 
-                # Apply button selectors (Naukri 2024 DOM)
+                # ── 1. Scan job description for Recruiter / HR email address ──
+                page_text = await jp.evaluate("() => document.body ? document.body.innerText : ''")
+                found_hr_emails = extract_recruiter_emails(page_text)
+                emailed_hr = False
+                for hr_em in found_hr_emails[:2]:
+                    if not is_already_applied(company, title, recruiter_email=hr_em):
+                        sent = await send_recruiter_direct_email(hr_em, title, company, job_url)
+                        if sent:
+                            applied += 1
+                            emailed_hr = True
+
+                # ── 2. Apply button on portal (Naukri 2024 DOM) ──
                 clicked = await safe_click(jp, [
                     "button#apply-button",
                     "button.apply-button",
@@ -310,31 +408,32 @@ async def auto_apply_naukri(context, keyword="Software Engineer", location="Indi
                     "span:has-text('Apply') >> xpath=..",
                 ], label="Naukri Apply", timeout=5000)
 
-                if not clicked:
-                    print(f"      -> No Apply button found. Skipping (NOT counting as applied).", flush=True)
+                if not clicked and not emailed_hr:
+                    print(f"      -> No Apply button or HR email found. Skipping.", flush=True)
                     await jp.close()
                     continue
 
-                # Wait for post-click state
-                await jp.wait_for_timeout(3000)
+                if clicked:
+                    # Wait for post-click state
+                    await jp.wait_for_timeout(3000)
 
-                # If a modal/confirmation appeared, look for a final submit
-                confirmed = await safe_click(jp, [
-                    "button:has-text('Apply')",
-                    "button:has-text('Submit')",
-                    "button:has-text('Confirm')",
-                    "button:has-text('Yes, apply')",
-                ], label="Naukri Confirm Submit", timeout=4000)
+                    # If a modal/confirmation appeared, look for a final submit
+                    confirmed = await safe_click(jp, [
+                        "button:has-text('Apply')",
+                        "button:has-text('Submit')",
+                        "button:has-text('Confirm')",
+                        "button:has-text('Yes, apply')",
+                    ], label="Naukri Confirm Submit", timeout=4000)
 
-                # Fill missing fields if a multi-step form opened
-                await fill_if_empty(jp, "input[name='email'], input[type='email']", USER_EMAIL)
-                await fill_if_empty(jp, "input[name='phone'], input[type='tel']", USER_PHONE)
-                await jp.wait_for_timeout(2000)
+                    # Fill missing fields if a multi-step form opened
+                    await fill_if_empty(jp, "input[name='email'], input[type='email']", USER_EMAIL)
+                    await fill_if_empty(jp, "input[name='phone'], input[type='tel']", USER_PHONE)
+                    await jp.wait_for_timeout(2000)
 
-                # Log ONLY on actual click
-                log_applied("Naukri", company, title, loc, job_url)
-                print(f"      >>> [APPLIED] '{title}' @ '{company}' on Naukri!", flush=True)
-                applied += 1
+                    # Log portal submission
+                    log_applied("Naukri", company, title, loc, job_url)
+                    print(f"      >>> [APPLIED] '{title}' @ '{company}' on Naukri!", flush=True)
+                    applied += 1
 
             except Exception as e:
                 print(f"      [ERROR] {e}", flush=True)
@@ -427,7 +526,18 @@ async def auto_apply_indeed(context, keyword="Software Engineer", location="Indi
                 await jp.goto(job_url, wait_until="domcontentloaded", timeout=25000)
                 await jp.wait_for_timeout(3000)
 
-                # Indeed Apply button selectors (2024)
+                # ── 1. Scan Indeed job description for HR / Recruiter email ──
+                page_text = await jp.evaluate("() => document.body ? document.body.innerText : ''")
+                found_hr_emails = extract_recruiter_emails(page_text)
+                emailed_hr = False
+                for hr_em in found_hr_emails[:2]:
+                    if not is_already_applied(company, title, recruiter_email=hr_em):
+                        sent = await send_recruiter_direct_email(hr_em, title, company, job_url)
+                        if sent:
+                            applied += 1
+                            emailed_hr = True
+
+                # ── 2. Indeed Apply button selectors (2024) ──
                 clicked = await safe_click(jp, [
                     "#indeedApplyButton",
                     "button[data-testid='indeedApplyButton']",
@@ -438,8 +548,13 @@ async def auto_apply_indeed(context, keyword="Software Engineer", location="Indi
                     "button:has-text('Easy Apply')",
                 ], label="Indeed Apply", timeout=6000)
 
-                if not clicked:
-                    print(f"      -> No Apply button found. Skipping (NOT counting as applied).", flush=True)
+                if not clicked and not emailed_hr:
+                    print(f"      -> No Apply button or HR email found. Skipping.", flush=True)
+                    await jp.close()
+                    continue
+
+                if not clicked and emailed_hr:
+                    print(f"      -> Applied directly via HR email. Closing job tab.", flush=True)
                     await jp.close()
                     continue
 
@@ -607,7 +722,18 @@ async def auto_apply_linkedin(context, keyword="Software Engineer", location="In
                 await jp.goto(job_url, wait_until="domcontentloaded", timeout=25000)
                 await jp.wait_for_timeout(3000)
 
-                # Easy Apply button selectors (LinkedIn 2024)
+                # ── 1. Scan LinkedIn job description for Recruiter / HR email ──
+                page_text = await jp.evaluate("() => document.body ? document.body.innerText : ''")
+                found_hr_emails = extract_recruiter_emails(page_text)
+                emailed_hr = False
+                for hr_em in found_hr_emails[:2]:
+                    if not is_already_applied(company, title, recruiter_email=hr_em):
+                        sent = await send_recruiter_direct_email(hr_em, title, company, job_url)
+                        if sent:
+                            applied += 1
+                            emailed_hr = True
+
+                # ── 2. Easy Apply button selectors (LinkedIn 2024) ──
                 clicked = await safe_click(jp, [
                     "button.jobs-apply-button[aria-label*='Easy Apply']",
                     "button[aria-label*='Easy Apply']",
@@ -616,8 +742,13 @@ async def auto_apply_linkedin(context, keyword="Software Engineer", location="In
                     "button.artdeco-button:has-text('Easy Apply')",
                 ], label="LinkedIn Easy Apply", timeout=7000)
 
-                if not clicked:
-                    print(f"      -> No Easy Apply button (may require manual apply or already applied). Skipping.", flush=True)
+                if not clicked and not emailed_hr:
+                    print(f"      -> No Easy Apply button or HR email found. Skipping.", flush=True)
+                    await jp.close()
+                    continue
+
+                if not clicked and emailed_hr:
+                    print(f"      -> Applied directly via HR email. Closing job tab.", flush=True)
                     await jp.close()
                     continue
 
