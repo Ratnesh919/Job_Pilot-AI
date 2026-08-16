@@ -22,6 +22,7 @@ if APP_ROOT not in sys.path:
 
 from portal_auto_applier import run_portal_automation
 from company_site_applier import run_company_website_and_multi_portal_bot
+from dom_job_applier import run_dom_applier
 from llm_job_finder import run_llm_email_job_search_and_apply
 CONFIG_PATH = os.path.join(APP_ROOT, "config.json")
 DATA_DIR = os.path.join(APP_ROOT, "data")
@@ -103,9 +104,20 @@ async def run_all_in_one_auto_bot(api_key=None, provider="openrouter", headless=
         except Exception as e:
             print(f"AI company applier notice for {role}: {e}", flush=True)
 
+    # STEP 2B: DOM Deep Form Filler — company career pages (Playwright DOM introspection)
+    print(f"\n=======================================================", flush=True)
+    print(f"   [STAGE 2B/4] DOM COMPANY APPLIER (Deep Form Introspection)", flush=True)
+    print(f"   Reads any form DOM, fills all fields, uploads Resume.pdf", flush=True)
+    print(f"=======================================================", flush=True)
+    for role in TARGET_ROLES[:3]:
+        try:
+            await run_dom_applier(keyword=role, max_companies=3, headless=headless)
+        except Exception as e:
+            print(f"DOM applier notice for {role}: {e}", flush=True)
+
     # STEP 3: LLM Unlisted Job Finder & Gmail Direct Email Dispatcher with Resume.pdf
     print(f"\n=======================================================", flush=True)
-    print(f"   [STAGE 3/3] LLM UNLISTED JOB FINDER & EMAIL DISPATCHER", flush=True)
+    print(f"   [STAGE 3/4] LLM UNLISTED JOB FINDER & EMAIL DISPATCHER", flush=True)
     print(f"   (Attaching: Resume.pdf)", flush=True)
     print(f"=======================================================", flush=True)
     try:
