@@ -364,16 +364,25 @@ async def fill_form_via_dom(page: Page, job_title: str = "") -> int:
                 continue
 
             # ── Text / Textarea ───────────────────────────────────────────
-            if ftype in ("text", "email", "tel", "number", "url", "textarea", "textarea"):
+            if ftype in ("text", "email", "tel", "number", "url", "textarea"):
                 value = match_field_value(field)
                 if value:
-                    # Clear existing content first
-                    await el.click()
-                    await el.select_text() if hasattr(el, 'select_text') else None
-                    await el.fill(value)
-                    print(f"      [DOM] Filled '{label or field_name}': {value[:40]}...", flush=True)
-                    filled += 1
-                    await page.wait_for_timeout(200)
+                    try:
+                        await el.scroll_into_view_if_needed()
+                        # Real-time visual focus outline
+                        await page.evaluate("el => { el.style.outline = '2px solid #38bdf8'; el.style.boxShadow = '0 0 12px #38bdf888'; }", el)
+                        await el.click()
+                        # Real-time typing animation
+                        try:
+                            await el.press_sequentially(str(value), delay=20)
+                        except Exception:
+                            await el.fill(str(value))
+                        await page.wait_for_timeout(100)
+                        await page.evaluate("el => { el.style.outline = 'none'; el.style.boxShadow = 'none'; }", el)
+                        print(f"      [DOM] Typed '{label or field_name}': {str(value)[:35]}...", flush=True)
+                        filled += 1
+                    except Exception:
+                        pass
 
         except Exception as e:
             # Don't crash on individual field errors

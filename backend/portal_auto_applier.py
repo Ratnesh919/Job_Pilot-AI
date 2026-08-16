@@ -92,13 +92,52 @@ def log_applied(platform, company, title, loc, job_url):
         pass
 
 
+async def show_browser_hud(page, text: str):
+    """Injects a real-time floating status badge in the open browser so you can watch live progress."""
+    try:
+        clean_text = text.replace("'", "\\'").replace('"', '\\"')
+        await page.evaluate(f"""() => {{
+            let hud = document.getElementById('applybot-live-hud');
+            if (!hud) {{
+                hud = document.createElement('div');
+                hud.id = 'applybot-live-hud';
+                hud.style.position = 'fixed';
+                hud.style.bottom = '24px';
+                hud.style.right = '24px';
+                hud.style.backgroundColor = '#0f172a';
+                hud.style.color = '#38bdf8';
+                hud.style.padding = '12px 20px';
+                hud.style.borderRadius = '12px';
+                hud.style.border = '1px solid #38bdf8';
+                hud.style.boxShadow = '0 10px 30px rgba(0,0,0,0.7)';
+                hud.style.zIndex = '999999999';
+                hud.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                hud.style.fontSize = '14px';
+                hud.style.fontWeight = '600';
+                hud.style.pointerEvents = 'none';
+                hud.style.transition = 'all 0.3s ease';
+                document.body.appendChild(hud);
+            }}
+            hud.innerHTML = '🤖 <span style="color:#ffffff; font-weight:700;">ApplyBot Pro:</span> ' + '{clean_text}';
+        }}""")
+    except Exception:
+        pass
+
+
 async def safe_click(page, selectors, label="button", timeout=6000):
-    """Try each selector, return True if clicked."""
+    """Try each selector, scroll into view, visibly highlight in green, and click in real-time."""
     for sel in selectors:
         try:
             el = await page.wait_for_selector(sel, timeout=timeout, state="visible")
             if el:
                 await el.scroll_into_view_if_needed()
+                # Real-time visual click highlight
+                try:
+                    await page.evaluate("el => { el.style.outline = '3px solid #10b981'; el.style.boxShadow = '0 0 16px #10b981aa'; }", el)
+                    await page.wait_for_timeout(180)
+                    await page.evaluate("el => { el.style.outline = 'none'; el.style.boxShadow = 'none'; }", el)
+                except Exception:
+                    pass
                 await el.click()
                 print(f"      -> Clicked [{label}]: {sel}", flush=True)
                 return True
@@ -108,13 +147,22 @@ async def safe_click(page, selectors, label="button", timeout=6000):
 
 
 async def fill_if_empty(page, selector, value):
-    """Fill a field only if it is currently empty."""
+    """Fill a field with real-time human keystrokes and visible field focus outline."""
     try:
         el = await page.query_selector(selector)
-        if el:
+        if el and await el.is_visible():
             cur = await el.input_value()
             if not cur.strip():
-                await el.fill(value)
+                await el.scroll_into_view_if_needed()
+                # Highlight active field in blue
+                await page.evaluate("el => { el.style.outline = '2px solid #3b82f6'; el.style.boxShadow = '0 0 10px #3b82f666'; }", el)
+                await el.click()
+                try:
+                    await el.press_sequentially(str(value), delay=25)
+                except Exception:
+                    await el.fill(str(value))
+                await page.wait_for_timeout(100)
+                await page.evaluate("el => { el.style.outline = 'none'; el.style.boxShadow = 'none'; }", el)
     except Exception:
         pass
 
